@@ -21,7 +21,7 @@
                         <a class="nav-link" href="transfer.php">Transfer Money</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="logout.php">Logout</a>
+                        <a class="nav-link" href="/auth/logout.php">Logout</a>
                     </li>
                 <?php else: ?>
                     <li class="nav-item">

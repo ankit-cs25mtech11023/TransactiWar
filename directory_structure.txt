@@ -12,13 +12,17 @@
 │   └── edit.php
 ├── transfer/
 │   └── index.php
+|   └── history.php
 ├── includes/
 │   ├── header.php
 │   ├── footer.php
 │   └── navbar.php
+|   └── logger.php --> The "Invisible" Mandatory File --> You must log user activity, inclusive of Webpage, Username, Timestamp, and Client's IP Address. You will need a PHP script that you include at the top of every single page to record this data into your database.
 ├── assets/
 │   ├── css/
 │   └── uploads/
+├── scripts/
+|   ├── auto_create.php --> The Deliverables specifically require a script to create accounts automatically. This will be a standalone PHP script you can run to instantly spawn 50 dummy users for testing or grading.
 ├── index.php
 ├── compose.yaml
 └── Dockerfile
