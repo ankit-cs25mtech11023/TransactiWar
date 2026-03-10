@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TransactiWar - Login</title>
+</head>
+<body>
+
+  <h2>TransactiWar - Login</h2>
+
+  <!-- Show error/success messages passed from PHP via URL -->
+  <!-- <?php if (isset($_GET['error']) && $_GET['error'] === 'invalid'): ?>
+    <p style="color:red;">Invalid username or password. Try again.</p>
+  <?php elseif (isset($_GET['msg']) && $_GET['msg'] === 'registered'): ?>
+    <p style="color:green;">Account created! You can now log in.</p>
+  <?php endif; ?> -->
+
+  <form action="login.php" method="POST">
+
+    <label for="username">Username:</label><br>
+    <input type="text" id="username" name="username" required><br><br>
+
+    <label for="password">Password:</label><br>
+    <input type="password" id="password" name="password" required><br><br>
+
+    <input type="submit" value="Login">
+
+  </form>
+
+  <br>
+  <a href="register.php">Don't have an account? Register here</a>
+
+</body>
+</html>
