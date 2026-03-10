@@ -1,0 +1,25 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:80"
+    volumes:
+      # This syncs your local folder to the container in real-time
+      - .:/var/www/html
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: transactiwar_db
+      # Using root for local dev is fine, but we can set a specific user later
+    ports:
+      - "3306:3306"
+    volumes:
+      # This ensures your database isn't wiped out when you stop the container
+      - db_data:/var/lib/mysql
+
+volumes:
+  db_data:
