@@ -1,0 +1,10 @@
+FROM php:8.2-apache
+
+# Install and enable the mysqli extension
+RUN docker-php-ext-install mysqli && docker-php-ext-enable mysqli
+
+# Enable Apache mod_rewrite (useful if you want clean URLs later)
+RUN a2enmod rewrite
+
+# Set the working directory
+WORKDIR /var/www/html
