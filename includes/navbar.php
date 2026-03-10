@@ -25,10 +25,10 @@
                     </li>
                 <?php else: ?>
                     <li class="nav-item">
-                        <a class="nav-link" href="login.php">Login</a>
+                        <a class="nav-link" href="/auth/login.php">Login</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="register.php">Register</a>
+                        <a class="nav-link" href="/auth/register.php">Register</a>
                     </li>
                 <?php endif; ?>
 

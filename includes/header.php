@@ -1,7 +1,11 @@
 <?php
-// Start the session at the very top of every page
-session_start();
+// Check if a session is already active before starting one
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 ?>
+<!DOCTYPE html>
+<html lang="en">
 <!DOCTYPE html>
 <html lang="en">
 <head>
