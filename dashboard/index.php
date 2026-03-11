@@ -325,11 +325,13 @@ include '../includes/header.php';
             <div class="col-lg-4">
                 <!-- Search Section -->
                 <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white border-bottom-0 pt-4 px-4 pb-2">
+                        <h5 class="mb-0 text-dark fw-bold font-family-sans-serif">Find Operatives</h5>
+                    </div>
                     <div class="card-body p-4">
-                        <h5 class="fw-bold mb-3 font-family-sans-serif text-dark">Find Operatives</h5>
                         <form action="../profile/view.php" method="GET">
                             <div class="input-group">
-                                <input type="text" name="user" class="form-control bg-light border-0" placeholder="Username or ID..." required>
+                                <input type="text" name="user" class="form-control bg-light" placeholder="Username or ID..." required>
                                 <button type="submit" class="btn btn-dark">Search</button>
                             </div>
                         </form>
