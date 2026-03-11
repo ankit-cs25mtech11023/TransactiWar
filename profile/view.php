@@ -21,25 +21,16 @@ $log_stmt->execute();
 $error = '';
 $profile_data = null;
 
-// 2. Fetch Target User Data based on the URL parameter
-$search_param = '';
-if (isset($_GET['user']) && !empty(trim($_GET['user']))) {
-    $search_param = trim($_GET['user']);
-    $query = "SELECT u.username, u.user_id, u.created_at, p.biography, p.profile_image_path 
-              FROM users u 
-              LEFT JOIN profiles p ON u.id = p.user_id 
-              WHERE u.user_id = ? OR u.username = ?";
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("ss", $search_param, $search_param);
-} elseif (isset($_GET['user_id']) && !empty(trim($_GET['user_id']))) {
-    $search_param = trim($_GET['user_id']);
-    
-    // Join users and profiles tables to get all the public info
+// 2. Fetch Target User Data based on the URL parameter ?user_id=WAR-XXXX
+if (isset($_GET['user_id']) && !empty(trim($_GET['user_id']))) {
+
+    $target_user_id = trim($_GET['user_id']);
+
     $query = "SELECT u.username, u.user_id, u.created_at, p.biography, p.profile_image_path 
               FROM users u 
               LEFT JOIN profiles p ON u.id = p.user_id 
               WHERE u.user_id = ?";
-              
+
     $stmt = $conn->prepare($query);
     $stmt->bind_param("s", $search_param);
 }
@@ -53,6 +44,7 @@ if ($search_param) {
     } else {
         $error = "Target user not found on the battlefield.";
     }
+
 } else {
     $error = "No user specified.";
 }
@@ -60,56 +52,109 @@ if ($search_param) {
 include '../includes/header.php'; 
 ?>
 
-<div class="row justify-content-center mt-5">
-    <div class="col-md-8">
-        
-        <?php if ($error): ?>
-            <div class="alert alert-warning fw-bold shadow-sm text-center">
-                <?php echo htmlspecialchars($error); ?>
-                <br><a href="../transfer/index.php" class="btn btn-sm btn-outline-dark mt-2">Return to Search</a>
-            </div>
-        <?php else: ?>
-            
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-secondary text-white text-center">
-                    <h4 class="mb-0">User Profile: <?php echo htmlspecialchars($profile_data['username']); ?></h4>
-                </div>
-                <div class="card-body p-4 text-center">
-                    
-                    <?php 
-                        $img_path = !empty($profile_data['profile_image_path']) ? $profile_data['profile_image_path'] : '../assets/uploads/default.png'; 
-                    ?>
-                    <img src="<?php echo htmlspecialchars($img_path); ?>" alt="Profile Image" class="img-thumbnail rounded-circle mb-3 shadow-sm" style="width: 150px; height: 150px; object-fit: cover;">
-                    
-                    <h2 class="mb-1 fw-bold"><?php echo htmlspecialchars($profile_data['username']); ?></h2>
-                    <p class="text-muted mb-4">
-                        Enlisted: <?php echo date('F j, Y', strtotime($profile_data['created_at'])); ?> 
-                        <br>
-                        ID: <span class="badge bg-light text-dark border"><?php echo htmlspecialchars($profile_data['user_id']); ?></span>
-                    </p>
-                    
-                    <div class="text-start bg-light p-4 rounded shadow-sm">
-                        <h5 class="fw-bold border-bottom pb-2">Biography</h5>
-                        <p class="mb-0" style="white-space: pre-wrap;"><?php 
-                            if (!empty($profile_data['biography'])) {
-                                echo htmlspecialchars($profile_data['biography']);
-                            } else {
-                                echo '<span class="text-muted fst-italic">This user prefers to keep their strategies secret.</span>';
-                            }
-                        ?></p>
-                    </div>
-                </div>
-                
-                <div class="card-footer text-center bg-white border-0 pb-4">
-                    <a href="../transfer/index.php?search_query=<?php echo urlencode($profile_data['user_id']); ?>" class="btn btn-success fw-bold px-4 shadow-sm">
-                        Send Money to <?php echo htmlspecialchars($profile_data['username']); ?>
-                    </a>
-                </div>
-            </div>
+<div style="display:flex;justify-content:center;margin-top:60px;">
 
-        <?php endif; ?>
+<?php if ($error): ?>
 
-    </div>
+<div style="width:700px;background:white;border-radius:12px;
+box-shadow:0 8px 20px rgba(0,0,0,0.15);padding:40px;text-align:center;">
+
+<h3 style="color:#e67e22;margin-bottom:15px;">
+<?php echo htmlspecialchars($error); ?>
+</h3>
+
+<a href="../transfer/index.php"
+style="background:#34495e;color:white;padding:10px 20px;
+border-radius:6px;text-decoration:none;font-weight:bold;">
+Return to Search
+</a>
+
+</div>
+
+<?php else: ?>
+
+<?php 
+$img_path = !empty($profile_data['profile_image_path']) 
+? $profile_data['profile_image_path'] 
+: '../assets/uploads/default.png'; 
+?>
+
+<div style="width:700px;background:white;border-radius:12px;
+box-shadow:0 8px 20px rgba(0,0,0,0.15);overflow:hidden;">
+
+<div style="background:#34495e;color:white;padding:18px;text-align:center;
+font-size:22px;font-weight:bold;">
+User Profile: <?php echo htmlspecialchars($profile_data['username']); ?>
+</div>
+
+<div style="padding:40px;text-align:center;">
+
+<img src="<?php echo htmlspecialchars($img_path); ?>"
+style="width:160px;height:160px;border-radius:50%;
+object-fit:cover;border:4px solid #ddd;margin-bottom:15px;">
+
+<h2 style="margin-bottom:5px;">
+<?php echo htmlspecialchars($profile_data['username']); ?>
+</h2>
+
+<p style="color:#777;margin-bottom:10px;">
+Joined <?php echo date('F j, Y', strtotime($profile_data['created_at'])); ?>
+</p>
+
+<p style="color:#777;margin-bottom:25px;font-size:14px;">
+ID: 
+<span style="background:#eee;padding:3px 8px;border-radius:4px;border:1px solid #ccc;">
+<?php echo htmlspecialchars($profile_data['user_id']); ?>
+</span>
+</p>
+
+<div style="text-align:left;background:#f8f9fa;padding:25px;
+border-radius:8px;border:1px solid #eee;">
+
+<h4 style="margin-bottom:10px;border-bottom:1px solid #ddd;padding-bottom:5px;">
+Biography
+</h4>
+
+<p style="white-space:pre-wrap;color:#444;">
+
+<?php
+if (!empty($profile_data['biography'])) {
+    echo htmlspecialchars($profile_data['biography']);
+} else {
+    echo '<span style="color:#888;font-style:italic;">This user prefers to keep their strategies secret.</span>';
+}
+?>
+
+</p>
+
+</div>
+
+</div>
+
+<div style="padding:20px;text-align:center;border-top:1px solid #eee;">
+
+<?php if ($profile_data['username'] === $_SESSION['username']): ?>
+
+<a href="edit.php"
+style="background:#3498db;color:white;padding:10px 22px;
+border-radius:6px;text-decoration:none;margin-right:10px;font-weight:bold;">
+Edit Profile
+</a>
+
+<?php endif; ?>
+
+<a href="../transfer/index.php?search_query=<?php echo urlencode($profile_data['user_id']); ?>"
+style="border:2px solid #27ae60;color:#27ae60;padding:10px 22px;
+border-radius:6px;text-decoration:none;font-weight:bold;">
+Send Money
+</a>
+
+</div>
+
+</div>
+
+<?php endif; ?>
+
 </div>
 
 <?php include '../includes/footer.php'; ?>

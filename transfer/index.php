@@ -20,10 +20,26 @@ $log_stmt   = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_a
 $log_stmt->bind_param("sss", $webpage, $username, $ip_address);
 $log_stmt->execute();
 
-$error        = '';
-$success      = '';
-$confirming   = false;
-$transferData = [];
+$error = '';
+$success = '';
+
+// Check for messages from redirect
+if (isset($_GET['status'])) {
+    if ($_GET['status'] === 'success') {
+        $success = "Transaction was successful!";
+    } elseif ($_GET['status'] === 'insufficient_funds') {
+        $error = "Insufficient funds. You cannot transfer more than your current balance.";
+    } elseif ($_GET['status'] === 'self_transfer') {
+        $error = "You cannot send money to yourself.";
+    } elseif ($_GET['status'] === 'invalid_receiver') {
+        $error = "Receiver User ID not found.";
+    } elseif ($_GET['status'] === 'invalid_amount') {
+        $error = "Transfer amount must be greater than zero.";
+    } else {
+        $error = "An unknown error occurred during the transaction.";
+    }
+}
+
 $search_results = [];
 
 // 2. Fetch User's Current Balance
@@ -50,56 +66,36 @@ if (isset($_GET['search_query']) && !empty(trim($_GET['search_query']))) {
     }
 }
 
-// 4. Handle POST
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action             = $_POST['action'] ?? 'confirm'; // default 'confirm' for backward compat
-    $receiver_public_id = trim($_POST['receiver_id'] ?? '');
-    $amount             = round(floatval($_POST['amount'] ?? 0), 2);
-    $comment            = trim($_POST['comment'] ?? '');
+// 4. Handle Money Transfer (POST Request)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST['amount'])) {
+    $receiver_public_id = trim($_POST['receiver_id']);
+    $amount = floatval($_POST['amount']);
+    $comment = trim($_POST['comment'] ?? ''); // Optional comment
 
-    // ── Step 1: Preview ───────────────────────────────────────────────────────
-    if ($action === 'preview') {
-        if ($amount <= 0) {
-            $error = "Transfer amount must be greater than zero.";
-        } elseif ($receiver_public_id === $user_public_id) {
-            $error = "You cannot send money to yourself.";
-        } elseif ($amount > $current_balance + 0.001) {
-            $error = "Insufficient funds. You cannot transfer more than your current balance.";
+    // Basic Validation
+    if ($amount <= 0) {
+        header("Location: index.php?status=invalid_amount");
+        exit();
+    } elseif ($receiver_public_id === $user_public_id) {
+        header("Location: index.php?status=self_transfer");
+        exit();
+    } elseif ($amount > $current_balance) {
+        // Prevent negative balance transactions
+        header("Location: index.php?status=insufficient_funds");
+        exit();
+    } else {
+        // Check if receiver exists and get their internal DB ID
+        $rec_stmt = $conn->prepare("SELECT id FROM users WHERE user_id = ?");
+        $rec_stmt->bind_param("s", $receiver_public_id);
+        $rec_stmt->execute();
+        $rec_result = $rec_stmt->get_result();
+
+        if ($rec_result->num_rows === 0) {
+            header("Location: index.php?status=invalid_receiver");
+            exit();
         } else {
-            // Check receiver exists
-            $rec_stmt = $conn->prepare("SELECT id, username FROM users WHERE user_id = ?");
-            $rec_stmt->bind_param("s", $receiver_public_id);
-            $rec_stmt->execute();
-            $rec_result = $rec_stmt->get_result();
+            $receiver_db_id = $rec_result->fetch_assoc()['id'];
 
-            if ($rec_result->num_rows === 0) {
-                $error = "Receiver User ID not found.";
-            } else {
-                $receiver_row = $rec_result->fetch_assoc();
-                $confirming   = true;
-                $transferData = [
-                    'receiver_db_id'    => $receiver_row['id'],
-                    'receiver_username' => $receiver_row['username'],
-                    'receiver_public_id'=> $receiver_public_id,
-                    'amount'            => $amount,
-                    'comment'           => $comment,
-                ];
-            }
-        }
-    }
-
-    // ── Step 2: Confirm & Execute ─────────────────────────────────────────────
-    elseif ($action === 'confirm') {
-        $receiver_db_id     = (int)$_POST['receiver_db_id'];
-        $receiver_public_id = trim($_POST['receiver_public_id'] ?? '');
-        $amount             = round(floatval($_POST['amount']), 2);
-        $comment            = trim($_POST['comment'] ?? '');
-
-        if ($amount <= 0) {
-            $error = "Transfer amount must be greater than zero.";
-        } elseif ($amount > $current_balance + 0.001) {
-            $error = "Insufficient funds. You cannot transfer more than your current balance.";
-        } else {
             // ==========================================
             // SECURE TRANSACTION BLOCK START
             // ==========================================
@@ -125,13 +121,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $conn->commit();
 
-                $success = "Successfully transferred Rs. " . number_format($amount, 2) . " to User ID: $receiver_public_id.";
-                // Update local balance so UI reflects immediately
-                $current_balance = round($current_balance - $amount, 2);
-
+                // Redirect on success
+                header("Location: index.php?status=success");
+                exit();
+                
             } catch (mysqli_sql_exception $exception) {
                 $conn->rollback();
-                $error = "Transaction failed due to a system error. No money was moved.";
+                header("Location: index.php?status=error");
+                exit();
             }
             // ==========================================
             // SECURE TRANSACTION BLOCK END
