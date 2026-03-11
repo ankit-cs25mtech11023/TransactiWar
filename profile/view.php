@@ -127,16 +127,7 @@ include '../includes/header.php';
     }
 </style>
 <div class="battle-page">
-    <svg class="bg-scene" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-    <ellipse cx="720" cy="580" rx="900" ry="260" fill="#7a3e00" opacity="0.4"/>
-    <polygon points="0,430 170,210 340,430" fill="#5a3010"/>
-    <polygon points="220,430 430,165 640,430" fill="#4a2808"/>
-    <polygon points="490,430 700,185 910,430" fill="#5a3010"/>
-    <polygon points="800,430 1020,155 1240,430" fill="#4a2808"/>
-    <polygon points="1100,430 1300,210 1440,380 1440,430" fill="#5a3010"/>
-    <rect x="0" y="430" width="1440" height="170" fill="#2e1800"/>
-    </g>
-  </svg>
+    <?php include '../includes/bg_scene.php'; ?>
     <div class="container content-wrapper mt-4">
         <div class="row justify-content-center">
             <div class="col-lg-8">
