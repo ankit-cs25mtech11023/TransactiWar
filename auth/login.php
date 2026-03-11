@@ -58,31 +58,18 @@ include '../includes/header.php';
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
-  html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-  }
-
-  /* Override Bootstrap container/row padding on this page */
-  body > .container,
-  body > .container-fluid {
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-  }
-
   .battle-page {
     position: fixed;
-    inset: 0;
+    top: 56px; /* below navbar */
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     background: linear-gradient(160deg, #f0ebe0 0%, #e8dfc9 50%, #ddd0b5 100%);
-    /* Push content down by nav height so it sits below the navbar */
-    padding-top: 56px;
+    z-index: 10;
   }
 
   .bg-scene {
