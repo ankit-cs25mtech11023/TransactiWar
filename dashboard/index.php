@@ -68,6 +68,7 @@ include '../includes/header.php';
 ?>
 
 <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
     body {
         background: linear-gradient(160deg, #f0ebe0 0%, #e8dfc9 50%, #ddd0b5 100%);
         font-family: 'Inter', sans-serif;
