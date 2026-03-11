@@ -18,7 +18,7 @@
                         <a class="nav-link" href="/profile/edit.php">Profile</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="transfer.php">Transfer Money</a>
+                        <a class="nav-link" href="/transfer/index.php">Transfer Money</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/auth/logout.php">Logout</a>
