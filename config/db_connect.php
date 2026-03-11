@@ -1,5 +1,6 @@
 <?php
 // Database configuration matching your compose.yaml file
+date_default_timezone_set('Asia/Kolkata');
 $host = 'db'; // This MUST be 'db' because that is the service name in Docker
 $dbname = 'transactiwar_db';
 $user = 'root'; 
@@ -14,6 +15,7 @@ try {
     
     // Set the charset to utf8mb4 for full Unicode support (including emojis in comments)
     $conn->set_charset("utf8mb4");
+    $conn->query("SET time_zone = '+05:30'");
     
 } catch (mysqli_sql_exception $e) {
     // If the connection fails, stop the script and show a generic error
