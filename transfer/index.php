@@ -215,9 +215,9 @@ include '../includes/header.php';
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
                     <div>
                         <h2 class="fw-bold mb-0">Money Transfer Operations</h2>
-                        <p class="text-white mt-1 mb-0">
+                        <p class="text-black mt-1 mb-0">
                             Current Available Balance:
-                            <strong class="fs-5" style="color: #20c997;">Rs. <?php echo number_format($current_balance, 2); ?></strong>
+                            <strong class="fs-5" style="color: #000000;">Rs. <?php echo number_format($current_balance, 2); ?></strong>
                         </p>
                     </div>
                     <a href="history.php" class="btn btn-dark">

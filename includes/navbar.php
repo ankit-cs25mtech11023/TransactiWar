@@ -1,10 +1,12 @@
 <style>
     .navbar-brand {
         font-family: 'Cinzel', serif;
-        font-size: 1.5rem;
+        font-size: 2.0rem;
+        text-transform: uppercase;
     }
     .nav-link {
         font-family: 'Cinzel', serif;
+        text-transform: uppercase;
     }
 </style>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
