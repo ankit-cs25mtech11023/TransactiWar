@@ -20,6 +20,7 @@ services:
     volumes:
       # This ensures your database isn't wiped out when you stop the container
       - db_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
 
 volumes:
   db_data:
