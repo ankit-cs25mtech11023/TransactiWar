@@ -329,9 +329,9 @@ include '../includes/header.php';
                         <h5 class="mb-0 text-dark fw-bold font-family-sans-serif">Find Operatives</h5>
                     </div>
                     <div class="card-body p-4">
-                        <form action="../profile/view.php" method="GET">
+                        <form action="../profile/search.php" method="GET">
                             <div class="input-group">
-                                <input type="text" name="user" class="form-control bg-light" placeholder="Username or ID..." required>
+                                <input type="text" name="query" class="form-control bg-light" placeholder="Username or ID..." required>
                                 <button type="submit" class="btn btn-dark">Search</button>
                             </div>
                         </form>
