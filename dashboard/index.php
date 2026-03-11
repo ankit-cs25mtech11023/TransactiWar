@@ -326,7 +326,7 @@ include '../includes/header.php';
                 <!-- Search Section -->
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-body p-4">
-                        <h5 class="fw-bold mb-3">Find Operatives</h5>
+                        <h5 class="fw-bold mb-3 font-family-sans-serif text-dark">Find Operatives</h5>
                         <form action="../profile/view.php" method="GET">
                             <div class="input-group">
                                 <input type="text" name="user" class="form-control bg-light border-0" placeholder="Username or ID..." required>
