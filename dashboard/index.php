@@ -339,7 +339,7 @@ include '../includes/header.php';
                 <!-- Quick Contacts -->
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-white border-bottom-0 pt-4 px-4 pb-2">
-                        <h5 class="mb-0 fw-bold">Recent Allies</h5>
+                        <h5 class="mb-0 text-dark fw-bold font-family-sans-serif">Recent Contacts</h5>
                     </div>
                     <div class="card-body p-4">
                         <div class="d-flex flex-column gap-3" style="max-height: 300px; overflow-y: auto;">
