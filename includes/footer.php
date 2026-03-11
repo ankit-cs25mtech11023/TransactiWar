@@ -1,4 +1,4 @@
-</div> <footer class="bg-dark text-white text-center py-3 mt-5">
+</div> <footer class="bg-dark text-white text-center py-3 mt-auto fixed-bottom">
         <p class="mb-0">&copy; 2026 TransactiWar Project. All rights reserved.</p>
     </footer>
 
