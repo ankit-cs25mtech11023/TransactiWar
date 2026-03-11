@@ -133,7 +133,7 @@ include '../includes/header.php';
                 </p>
             </div>
             <a href="history.php" class="btn btn-dark">
-                📋 &nbsp;View Transaction History
+                View Transaction History
             </a>
         </div>
     </div>
@@ -173,16 +173,10 @@ include '../includes/header.php';
                                             <h6 class="mb-1 fw-bold"><?php echo htmlspecialchars($res['username']); ?></h6>
                                             <small class="text-muted">ID: <?php echo htmlspecialchars($res['user_id']); ?></small>
                                         </div>
-                                        <div class="d-flex gap-2">
-                                            <button class="btn btn-sm btn-primary"
-                                                    onclick="document.getElementById('receiver_id').value = '<?php echo htmlspecialchars($res['user_id']); ?>';">
-                                                Select
-                                            </button>
-                                            <a href="history.php?filter=all&search=<?php echo urlencode($res['username']); ?>"
-                                               class="btn btn-sm btn-outline-secondary" title="View transactions with this user">
-                                                📋 Transactions
-                                            </a>
-                                        </div>
+                                        <button class="btn btn-sm btn-primary"
+                                                onclick="document.getElementById('receiver_id').value = '<?php echo htmlspecialchars($res['user_id']); ?>';">
+                                            Select
+                                        </button>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
