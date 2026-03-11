@@ -6,6 +6,7 @@ services:
     volumes:
       # This syncs your local folder to the container in real-time
       - .:/var/www/html
+      - secure_uploads:/var/www/uploads
     depends_on:
       - db
 
@@ -24,3 +25,4 @@ services:
 
 volumes:
   db_data:
+  secure_uploads:

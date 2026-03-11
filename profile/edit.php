@@ -69,20 +69,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
 
             $new_file_name = $user_public_id . '_' . time() . '.' . $file_extension;
-            $destination_path = $upload_dir . $new_file_name;
+            
+            // THE SECURE FIX: Point to the isolated directory outside the web root
+            $secure_upload_dir = '/var/www/uploads/';
+            $destination_path = $secure_upload_dir . $new_file_name;
 
-            if (move_uploaded_file($file_tmp_path,$destination_path)) {
-
-                $db_image_path = '../assets/uploads/' . $new_file_name;
-
+            if (move_uploaded_file($file_tmp_path, $destination_path)) {
+                // Only save the filename to the database, NOT the path
                 $update_img = $conn->prepare("UPDATE profiles SET profile_image_path = ? WHERE user_id = ?");
-                $update_img->bind_param("si",$db_image_path,$user_db_id);
+                $update_img->bind_param("si", $new_file_name, $user_db_id);
                 $update_img->execute();
-
             } else {
-
-                $error = "Error uploading file.";
-
+                $error = "Error saving file to secure storage.";
             }
         }
     }
@@ -133,7 +131,7 @@ Edit Profile
 <div style="text-align:center;">
 
 <img id="preview"
-src="<?php echo htmlspecialchars($current_data['profile_image_path']); ?>"
+src="avatar.php"
 style="width:150px;height:150px;border-radius:50%;
 object-fit:cover;border:4px solid #ddd;margin-bottom:10px;">
 

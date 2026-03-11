@@ -211,7 +211,7 @@ User Profile: <?php echo htmlspecialchars($profile_data['username']); ?>
 
 <div class="card-body p-4 text-center">
 
-<img src="<?php echo htmlspecialchars($img_path); ?>"
+<img src="avatar.php?user_id=<?php echo urlencode($profile_data['user_id']); ?>"
 style="width:160px;height:160px;border-radius:50%;
 object-fit:cover;border:4px solid #ddd;margin-bottom:15px;">
 

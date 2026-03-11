@@ -8,3 +8,7 @@ RUN a2enmod rewrite
 
 # Set the working directory
 WORKDIR /var/www/html
+
+RUN mkdir -p /var/www/uploads \
+    && chown -R www-data:www-data /var/www/uploads \
+    && chmod -R 755 /var/www/uploads
