@@ -98,7 +98,7 @@ $stats_stmt->execute();
 $stats = $stats_stmt->get_result()->fetch_assoc();
 
 function pageUrl(int $p, string $filter, string $search): string {
-    return "transfer.php?" . http_build_query(['filter' => $filter, 'search' => $search, 'page' => $p]);
+    return "history.php?" . http_build_query(['filter' => $filter, 'search' => $search, 'page' => $p]);
 }
 
 include '../includes/header.php';
@@ -148,7 +148,7 @@ include '../includes/header.php';
         </div>
     </div>
     <div class="col-md-6 mb-2">
-        <form method="GET" action="transfer.php">
+        <form method="GET" action="history.php">
             <input type="hidden" name="filter" value="<?php echo htmlspecialchars($filter); ?>">
             <input type="hidden" name="page"   value="1">
             <div class="input-group input-group-sm">
