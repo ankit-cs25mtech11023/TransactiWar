@@ -22,6 +22,24 @@ $log_stmt->execute();
 
 $error = '';
 $success = '';
+
+// Check for messages from redirect
+if (isset($_GET['status'])) {
+    if ($_GET['status'] === 'success') {
+        $success = "Transaction was successful!";
+    } elseif ($_GET['status'] === 'insufficient_funds') {
+        $error = "Insufficient funds. You cannot transfer more than your current balance.";
+    } elseif ($_GET['status'] === 'self_transfer') {
+        $error = "You cannot send money to yourself.";
+    } elseif ($_GET['status'] === 'invalid_receiver') {
+        $error = "Receiver User ID not found.";
+    } elseif ($_GET['status'] === 'invalid_amount') {
+        $error = "Transfer amount must be greater than zero.";
+    } else {
+        $error = "An unknown error occurred during the transaction.";
+    }
+}
+
 $search_results = [];
 
 // 2. Fetch User's Current Balance for the UI
@@ -54,12 +72,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
 
     // Basic Validation
     if ($amount <= 0) {
-        $error = "Transfer amount must be greater than zero.";
+        header("Location: index.php?status=invalid_amount");
+        exit();
     } elseif ($receiver_public_id === $user_public_id) {
-        $error = "You cannot send money to yourself.";
+        header("Location: index.php?status=self_transfer");
+        exit();
     } elseif ($amount > $current_balance) {
         // Prevent negative balance transactions
-        $error = "Insufficient funds. You cannot transfer more than your current balance.";
+        header("Location: index.php?status=insufficient_funds");
+        exit();
     } else {
         // Check if receiver exists and get their internal DB ID
         $rec_stmt = $conn->prepare("SELECT id FROM users WHERE user_id = ?");
@@ -68,7 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
         $rec_result = $rec_stmt->get_result();
 
         if ($rec_result->num_rows === 0) {
-            $error = "Receiver User ID not found.";
+            header("Location: index.php?status=invalid_receiver");
+            exit();
         } else {
             $receiver_db_id = $rec_result->fetch_assoc()['id'];
 
@@ -96,14 +118,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
                 // Commit the transaction (Make it permanent)
                 $conn->commit();
 
-                $success = "Successfully transferred Rs. " . number_format($amount, 2) . " to User ID: $receiver_public_id.";
-                // Update local balance variable so the UI reflects the new amount immediately
-                $current_balance -= $amount; 
+                // Redirect on success
+                header("Location: index.php?status=success");
+                exit();
                 
             } catch (mysqli_sql_exception $exception) {
                 // If anything goes wrong, rollback to prevent lost money
                 $conn->rollback();
-                $error = "Transaction failed due to a system error. No money was moved.";
+                header("Location: index.php?status=error");
+                exit();
             }
             // ==========================================
             // SECURE TRANSACTION BLOCK END
