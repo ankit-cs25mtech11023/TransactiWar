@@ -13,8 +13,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = trim($_POST['email']);
     $password = $_POST['password'];
 
+    // --- Validation Rules ---
     if (empty($username) || empty($email) || empty($password)) {
-        $error = "All fields are required.";
+        $error = "EMPTY_FIELDS";
+
+    // Username: 3-20 chars, only letters, numbers, underscores, hyphens
+    } elseif (!preg_match('/^[a-zA-Z0-9_-]{3,20}$/', $username)) {
+        $error = "INVALID_USERNAME";
+
+    // Email: must be valid format
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "INVALID_EMAIL";
+
+    // Email: must be @iith.ac.in
+    } elseif (!str_ends_with(strtolower($email), '@iith.ac.in')) {
+        $error = "NOT_INSTITUTE";
+
+    // Password: minimum 8 chars
+    } elseif (strlen($password) < 8) {
+        $error = "PASSWORD_SHORT";
+
+    // Password: must have letter + number
+    } elseif (!preg_match('/[A-Za-z]/', $password) || !preg_match('/[0-9]/', $password)) {
+        $error = "PASSWORD_WEAK";
+
     } else {
         // 3. Hash the password securely using PHP's built-in bcrypt
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
@@ -46,9 +68,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } catch (mysqli_sql_exception $e) {
             if ($e->getCode() == 1062) {
-                $error = "That username or email is already taken. Please choose another.";
+                // Detect which field caused the duplicate by checking the error message
+                $errMsg = $e->getMessage();
+                if (stripos($errMsg, 'username') !== false) {
+                    $error = "DUPLICATE_USERNAME";
+                } elseif (stripos($errMsg, 'email') !== false) {
+                    $error = "DUPLICATE_EMAIL";
+                } else {
+                    $error = "DUPLICATE_GENERIC";
+                }
             } else {
-                $error = "A system error occurred. Please try again later.";
+                $error = "SYSTEM_ERROR";
             }
         }
     }
@@ -237,6 +267,104 @@ include '../includes/header.php';
   }
 
   footer, .footer { position: relative; z-index: 20; }
+
+  /* ── POPUP MODALS ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0,0,0,0.55);
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal-box {
+    background: rgba(255,253,248,0.97);
+    border: 1px solid rgba(170,145,100,0.3);
+    border-radius: 6px;
+    max-width: 360px;
+    width: 90%;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    animation: modalPop 0.25s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  @keyframes modalPop {
+    from { opacity:0; transform: scale(0.92) translateY(12px); }
+    to   { opacity:1; transform: scale(1) translateY(0); }
+  }
+
+  .modal-head {
+    background: #1c1c1c;
+    padding: 1rem 1.5rem;
+    position: relative;
+  }
+  .modal-head::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 8%; right: 8%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #8b2500, #c0392b, #8b2500, transparent);
+  }
+  .modal-head h5 {
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #f0e8d8;
+    margin: 0;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+    text-align: center;
+  }
+  .modal-icon { font-size: 2.2rem; margin-bottom: 0.75rem; display: block; }
+  .modal-msg {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    color: #4a3a28;
+    line-height: 1.55;
+    margin-bottom: 1.25rem;
+  }
+  .modal-msg strong { color: #8b2500; }
+
+  .modal-foot {
+    padding: 0 1.5rem 1.5rem;
+    display: flex;
+    gap: 0.6rem;
+  }
+  .modal-btn {
+    flex: 1;
+    padding: 0.65rem;
+    border: none;
+    border-radius: 3px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.12s;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-btn-dark {
+    background: #1c1c1c;
+    color: #f0e8d8;
+  }
+  .modal-btn-dark:hover { background: #8b2500; }
+  .modal-btn-outline {
+    background: transparent;
+    color: #6b5a42;
+    border: 1px solid rgba(155,130,90,0.35);
+  }
+  .modal-btn-outline:hover { background: rgba(155,130,90,0.1); }
 </style>
 
 <div class="battle-page">
@@ -325,24 +453,21 @@ include '../includes/header.php';
 
       <div class="card-body-inner">
 
-        <?php if ($error): ?>
-          <div class="field-alert field-alert-error">⚠ <?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
-        <?php if ($success): ?>
-          <div class="field-alert field-alert-success">✔ <?php echo htmlspecialchars($success); ?></div>
-        <?php endif; ?>
 
-        <form action="register.php" method="POST">
+
+        <form action="register.php" method="POST" id="registerForm">
 
           <label class="field-label" for="username">Username</label>
           <input type="text" class="field-input" id="username" name="username" placeholder="Choose a unique name" required value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>">
-          <span class="field-hint">Your username must be unique.</span>
+          <span class="field-hint">3–20 chars. Letters, numbers, _ and - only. No spaces or symbols.</span>
 
           <label class="field-label" for="email">Email Address</label>
-          <input type="email" class="field-input" id="email" name="email" placeholder="Enter your email" required value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+          <input type="email" class="field-input" id="email" name="email" placeholder="your.name@iith.ac.in" required value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+          <span class="field-hint">Must be an @iith.ac.in address.</span>
 
           <label class="field-label" for="password">Password</label>
-          <input type="password" class="field-input" id="password" name="password" placeholder="Create a password" required>
+          <input type="password" class="field-input" id="password" name="password" placeholder="Min. 8 chars with a letter &amp; number" required>
+          <span class="field-hint">At least 8 characters, one letter and one number.</span>
 
           <button type="submit" class="btn-login">Create Account</button>
 
@@ -359,5 +484,84 @@ include '../includes/header.php';
   </div>
 
 </div>
+
+<!-- ── ERROR MODAL (reused for all validation errors) ── -->
+<div class="modal-overlay" id="errorModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h5 id="errorModalTitle">⚔ &nbsp;Invalid Entry&nbsp; ⚔</h5>
+    </div>
+    <div class="modal-body">
+      <span class="modal-icon" id="errorModalIcon">⚠️</span>
+      <p class="modal-msg" id="errorModalMsg"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="modal-btn modal-btn-dark" onclick="closeModal('errorModal')">Try Again</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SUCCESS MODAL ── -->
+<div class="modal-overlay" id="successModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h5>⚔ &nbsp;Oath Sworn&nbsp; ⚔</h5>
+    </div>
+    <div class="modal-body">
+      <span class="modal-icon">🏆</span>
+      <p class="modal-msg">
+        Your warrior account has been created successfully!<br><br>
+        You may now enter the battlefield.
+      </p>
+    </div>
+    <div class="modal-foot">
+      <a href="login.php" class="modal-btn modal-btn-dark">Go to Login</a>
+      <button class="modal-btn modal-btn-outline" onclick="closeModal('successModal')">Stay Here</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const errorMessages = {
+    'EMPTY_FIELDS':       { icon: '📋', title: 'Missing Fields',      msg: 'All fields are required.<br>Please fill in your username, email and password.' },
+    'INVALID_USERNAME':   { icon: '🚫', title: 'Invalid Username',     msg: 'Username must be <strong>3–20 characters</strong> and can only contain:<br><br>✔ Letters (a–z, A–Z)<br>✔ Numbers (0–9)<br>✔ Underscore _<br>✔ Hyphen -<br><br>No spaces, @, $, ! or other symbols.' },
+    'INVALID_EMAIL':      { icon: '✉️', title: 'Invalid Email',        msg: 'Please enter a <strong>valid email address</strong>.<br><br>Example: <strong>yourname@iith.ac.in</strong>' },
+    'NOT_INSTITUTE':      { icon: '🚫', title: 'Access Denied',        msg: 'Only warriors from <strong>IIT Hyderabad</strong> may enter the arena.<br><br>Your email must end with <strong>@iith.ac.in</strong> to register.' },
+    'PASSWORD_SHORT':     { icon: '🔒', title: 'Password Too Short',   msg: 'Your password must be <strong>at least 8 characters</strong> long.<br><br>Choose a stronger password to protect your account.' },
+    'PASSWORD_WEAK':      { icon: '🔒', title: 'Weak Password',        msg: 'Your password must contain:<br><br>✔ At least one <strong>letter</strong><br>✔ At least one <strong>number</strong><br><br>Example: <strong>warrior42</strong>' },
+    'DUPLICATE_USERNAME': { icon: '⚔️', title: 'Username Taken',       msg: 'That <strong>username</strong> is already enlisted in the army.<br><br>Please choose a different warrior name.' },
+    'DUPLICATE_EMAIL':    { icon: '✉️', title: 'Email Already Registered', msg: 'That <strong>email</strong> is already registered.<br><br>Try <a href="login.php" style="color:#8b2500;font-weight:600;">logging in</a> instead.' },
+    'DUPLICATE_GENERIC':  { icon: '⚔️', title: 'Already Enlisted',    msg: 'That username or email is already taken.<br>Please choose another.' },
+    'SYSTEM_ERROR':       { icon: '⚙️', title: 'System Error',         msg: 'A system error occurred. Please try again later.' },
+  };
+
+  function openModal(id) {
+    document.getElementById(id).classList.add('show');
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+  }
+
+  document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) overlay.classList.remove('show');
+    });
+  });
+
+  <?php if ($error): ?>
+    (function() {
+      var code = '<?php echo $error; ?>';
+      var data = errorMessages[code] || { icon: '⚠️', title: 'Error', msg: code };
+      document.getElementById('errorModalTitle').innerHTML = '⚔ &nbsp;' + data.title + '&nbsp; ⚔';
+      document.getElementById('errorModalIcon').textContent = data.icon;
+      document.getElementById('errorModalMsg').innerHTML = data.msg;
+      openModal('errorModal');
+    })();
+  <?php endif; ?>
+
+  <?php if ($success): ?>
+    openModal('successModal');
+  <?php endif; ?>
+</script>
 
 <?php include '../includes/footer.php'; ?>
