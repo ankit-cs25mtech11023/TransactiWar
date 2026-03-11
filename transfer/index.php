@@ -9,35 +9,39 @@ if (!isset($_SESSION['db_id'])) {
 
 require_once '../config/db_connect.php';
 
-$user_db_id = $_SESSION['db_id'];
-$username = $_SESSION['username'];
+$user_db_id     = $_SESSION['db_id'];
+$username       = $_SESSION['username'];
 $user_public_id = $_SESSION['user_id'];
 
 // 1. Mandatory Logging
 $ip_address = $_SERVER['REMOTE_ADDR'];
-$webpage = "/transfer/index.php";
-$log_stmt = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
+$webpage    = "/transfer/index.php";
+$log_stmt   = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
 $log_stmt->bind_param("sss", $webpage, $username, $ip_address);
 $log_stmt->execute();
 
-$error = '';
-$success = '';
+$error        = '';
+$success      = '';
+$confirming   = false;
+$transferData = [];
 $search_results = [];
 
-// 2. Fetch User's Current Balance for the UI
+// 2. Fetch User's Current Balance
 $bal_stmt = $conn->prepare("SELECT balance FROM users WHERE id = ?");
 $bal_stmt->bind_param("i", $user_db_id);
 $bal_stmt->execute();
-$bal_result = $bal_stmt->get_result();
-$current_balance = $bal_result->fetch_assoc()['balance'];
+$current_balance = $bal_stmt->get_result()->fetch_assoc()['balance'];
 
-// 3. Handle User Search (GET Request)
+// 3. Handle User Search (GET)
 if (isset($_GET['search_query']) && !empty(trim($_GET['search_query']))) {
     $search_term = trim($_GET['search_query']);
     $search_like = "%" . $search_term . "%";
-    
-    // Search by username or user ID, but exclude the logged-in user from results
-    $search_stmt = $conn->prepare("SELECT user_id, username FROM users WHERE (username LIKE ? OR user_id = ?) AND id != ? LIMIT 10");
+
+    $search_stmt = $conn->prepare(
+        "SELECT user_id, username FROM users
+         WHERE (username LIKE ? OR user_id = ?) AND id != ?
+         LIMIT 10"
+    );
     $search_stmt->bind_param("ssi", $search_like, $search_term, $user_db_id);
     $search_stmt->execute();
     $res = $search_stmt->get_result();
@@ -46,37 +50,60 @@ if (isset($_GET['search_query']) && !empty(trim($_GET['search_query']))) {
     }
 }
 
-// 4. Handle Money Transfer (POST Request)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST['amount'])) {
-    $receiver_public_id = trim($_POST['receiver_id']);
-    $amount = floatval($_POST['amount']);
-    $comment = trim($_POST['comment'] ?? ''); // Optional comment
+// 4. Handle POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action             = $_POST['action'] ?? 'confirm'; // default 'confirm' for backward compat
+    $receiver_public_id = trim($_POST['receiver_id'] ?? '');
+    $amount             = round(floatval($_POST['amount'] ?? 0), 2);
+    $comment            = trim($_POST['comment'] ?? '');
 
-    // Basic Validation
-    if ($amount <= 0) {
-        $error = "Transfer amount must be greater than zero.";
-    } elseif ($receiver_public_id === $user_public_id) {
-        $error = "You cannot send money to yourself.";
-    } elseif ($amount > $current_balance) {
-        // Prevent negative balance transactions
-        $error = "Insufficient funds. You cannot transfer more than your current balance.";
-    } else {
-        // Check if receiver exists and get their internal DB ID
-        $rec_stmt = $conn->prepare("SELECT id FROM users WHERE user_id = ?");
-        $rec_stmt->bind_param("s", $receiver_public_id);
-        $rec_stmt->execute();
-        $rec_result = $rec_stmt->get_result();
-
-        if ($rec_result->num_rows === 0) {
-            $error = "Receiver User ID not found.";
+    // ── Step 1: Preview ───────────────────────────────────────────────────────
+    if ($action === 'preview') {
+        if ($amount <= 0) {
+            $error = "Transfer amount must be greater than zero.";
+        } elseif ($receiver_public_id === $user_public_id) {
+            $error = "You cannot send money to yourself.";
+        } elseif ($amount > $current_balance + 0.001) {
+            $error = "Insufficient funds. You cannot transfer more than your current balance.";
         } else {
-            $receiver_db_id = $rec_result->fetch_assoc()['id'];
+            // Check receiver exists
+            $rec_stmt = $conn->prepare("SELECT id, username FROM users WHERE user_id = ?");
+            $rec_stmt->bind_param("s", $receiver_public_id);
+            $rec_stmt->execute();
+            $rec_result = $rec_stmt->get_result();
 
+            if ($rec_result->num_rows === 0) {
+                $error = "Receiver User ID not found.";
+            } else {
+                $receiver_row = $rec_result->fetch_assoc();
+                $confirming   = true;
+                $transferData = [
+                    'receiver_db_id'    => $receiver_row['id'],
+                    'receiver_username' => $receiver_row['username'],
+                    'receiver_public_id'=> $receiver_public_id,
+                    'amount'            => $amount,
+                    'comment'           => $comment,
+                ];
+            }
+        }
+    }
+
+    // ── Step 2: Confirm & Execute ─────────────────────────────────────────────
+    elseif ($action === 'confirm') {
+        $receiver_db_id     = (int)$_POST['receiver_db_id'];
+        $receiver_public_id = trim($_POST['receiver_public_id'] ?? '');
+        $amount             = round(floatval($_POST['amount']), 2);
+        $comment            = trim($_POST['comment'] ?? '');
+
+        if ($amount <= 0) {
+            $error = "Transfer amount must be greater than zero.";
+        } elseif ($amount > $current_balance + 0.001) {
+            $error = "Insufficient funds. You cannot transfer more than your current balance.";
+        } else {
             // ==========================================
             // SECURE TRANSACTION BLOCK START
             // ==========================================
             $conn->begin_transaction();
-
             try {
                 // Deduct from Sender
                 $deduct_stmt = $conn->prepare("UPDATE users SET balance = balance - ? WHERE id = ?");
@@ -88,20 +115,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
                 $add_stmt->bind_param("di", $amount, $receiver_db_id);
                 $add_stmt->execute();
 
-                // Record the Transaction Ledger
-                $tx_stmt = $conn->prepare("INSERT INTO transactions (sender_id, receiver_id, amount, comment) VALUES (?, ?, ?, ?)");
+                // Record the Transaction
+                $tx_stmt = $conn->prepare(
+                    "INSERT INTO transactions (sender_id, receiver_id, amount, comment)
+                     VALUES (?, ?, ?, ?)"
+                );
                 $tx_stmt->bind_param("iids", $user_db_id, $receiver_db_id, $amount, $comment);
                 $tx_stmt->execute();
 
-                // Commit the transaction (Make it permanent)
                 $conn->commit();
 
                 $success = "Successfully transferred Rs. " . number_format($amount, 2) . " to User ID: $receiver_public_id.";
-                // Update local balance variable so the UI reflects the new amount immediately
-                $current_balance -= $amount; 
-                
+                // Update local balance so UI reflects immediately
+                $current_balance = round($current_balance - $amount, 2);
+
             } catch (mysqli_sql_exception $exception) {
-                // If anything goes wrong, rollback to prevent lost money
                 $conn->rollback();
                 $error = "Transaction failed due to a system error. No money was moved.";
             }
@@ -112,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
     }
 }
 
-include '../includes/header.php'; 
+include '../includes/header.php';
 ?>
 
 <div class="row mt-4">
@@ -123,13 +151,78 @@ include '../includes/header.php';
 </div>
 
 <?php if ($error): ?>
-    <div class="alert alert-danger fw-bold shadow-sm"><?php echo htmlspecialchars($error); ?></div>
-<?php endif; ?>
-<?php if ($success): ?>
-    <div class="alert alert-success fw-bold shadow-sm"><?php echo htmlspecialchars($success); ?></div>
+    <div class="alert alert-danger fw-bold shadow-sm alert-dismissible fade show">
+        <?php echo htmlspecialchars($error); ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
 <?php endif; ?>
 
+<?php if ($success): ?>
+    <div class="alert alert-success fw-bold shadow-sm alert-dismissible fade show">
+        <?php echo htmlspecialchars($success); ?>
+        &nbsp;<a href="transfer.php" class="alert-link">View History →</a>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
+
+
+<?php if ($confirming): ?>
+<!-- ══════════════════════════════════════════
+     CONFIRMATION SCREEN
+══════════════════════════════════════════ -->
 <div class="row">
+    <div class="col-md-6 offset-md-3 mb-4">
+        <div class="card shadow-sm border-warning border-2">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">⚠ Confirm Transfer</h5>
+            </div>
+            <div class="card-body p-4">
+                <table class="table table-borderless mb-4">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted fw-bold">To</td>
+                            <td class="fw-bold">
+                                <?php echo htmlspecialchars($transferData['receiver_username']); ?>
+                                <small class="text-muted">(<?php echo htmlspecialchars($transferData['receiver_public_id']); ?>)</small>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted fw-bold">Amount</td>
+                            <td class="text-success fw-bold fs-5">Rs. <?php echo number_format($transferData['amount'], 2); ?></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted fw-bold">Balance After</td>
+                            <td class="text-danger fw-bold">Rs. <?php echo number_format(max(0, $current_balance - $transferData['amount']), 2); ?></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted fw-bold">Comment</td>
+                            <td><?php echo $transferData['comment'] ? htmlspecialchars($transferData['comment']) : '<span class="text-muted">—</span>'; ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <form action="index.php" method="POST">
+                    <input type="hidden" name="action"              value="confirm">
+                    <input type="hidden" name="receiver_db_id"      value="<?php echo $transferData['receiver_db_id']; ?>">
+                    <input type="hidden" name="receiver_public_id"  value="<?php echo htmlspecialchars($transferData['receiver_public_id']); ?>">
+                    <input type="hidden" name="amount"              value="<?php echo $transferData['amount']; ?>">
+                    <input type="hidden" name="comment"             value="<?php echo htmlspecialchars($transferData['comment']); ?>">
+                    <div class="d-flex gap-2">
+                        <a href="index.php" class="btn btn-outline-secondary w-50">← Edit</a>
+                        <button type="submit" class="btn btn-success w-50 fw-bold">✓ Confirm & Send</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php else: ?>
+<!-- ══════════════════════════════════════════
+     MAIN TRANSFER FORM
+══════════════════════════════════════════ -->
+<div class="row">
+
     <div class="col-md-5 mb-4">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-secondary text-white">
@@ -138,11 +231,14 @@ include '../includes/header.php';
             <div class="card-body bg-light">
                 <form action="index.php" method="GET" class="mb-3">
                     <div class="input-group">
-                        <input type="text" class="form-control" name="search_query" placeholder="Search by Username..." value="<?php echo isset($_GET['search_query']) ? htmlspecialchars($_GET['search_query']) : ''; ?>" required>
+                        <input type="text" class="form-control" name="search_query"
+                               placeholder="Search by Username..."
+                               value="<?php echo isset($_GET['search_query']) ? htmlspecialchars($_GET['search_query']) : ''; ?>"
+                               required>
                         <button class="btn btn-outline-secondary" type="submit">Search</button>
                     </div>
                 </form>
-                
+
                 <div class="list-group">
                     <?php if (isset($_GET['search_query'])): ?>
                         <?php if (count($search_results) > 0): ?>
@@ -153,7 +249,10 @@ include '../includes/header.php';
                                             <h6 class="mb-1 fw-bold"><?php echo htmlspecialchars($res['username']); ?></h6>
                                             <small class="text-muted">ID: <?php echo htmlspecialchars($res['user_id']); ?></small>
                                         </div>
-                                        <button class="btn btn-sm btn-primary" onclick="document.getElementById('receiver_id').value = '<?php echo htmlspecialchars($res['user_id']); ?>';">Select</button>
+                                        <button class="btn btn-sm btn-primary"
+                                                onclick="document.getElementById('receiver_id').value = '<?php echo htmlspecialchars($res['user_id']); ?>';">
+                                            Select
+                                        </button>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -173,26 +272,45 @@ include '../includes/header.php';
             </div>
             <div class="card-body p-4">
                 <form action="index.php" method="POST">
+                    <input type="hidden" name="action" value="preview">
+
                     <div class="mb-3">
                         <label for="receiver_id" class="form-label fw-bold text-muted">Receiver User ID</label>
-                        <input type="text" class="form-control" id="receiver_id" name="receiver_id" placeholder="e.g., WAR-1234ABCD" required>
+                        <input type="text" class="form-control" id="receiver_id" name="receiver_id"
+                               placeholder="e.g., WAR-1234ABCD"
+                               value="<?php echo htmlspecialchars($_POST['receiver_id'] ?? ''); ?>"
+                               required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="amount" class="form-label fw-bold text-muted">Amount (Rs.)</label>
-                        <input type="number" class="form-control" id="amount" name="amount" min="1" step="0.01" placeholder="0.00" required>
+                        <input type="number" class="form-control" id="amount" name="amount"
+                               min="0.01" step="0.01" placeholder="0.00"
+                               max="<?php echo $current_balance; ?>"
+                               value="<?php echo htmlspecialchars($_POST['amount'] ?? ''); ?>"
+                               required>
+                        <div class="form-text text-muted">
+                            Max transferable: <strong>Rs. <?php echo number_format($current_balance, 2); ?></strong>
+                        </div>
                     </div>
 
                     <div class="mb-4">
                         <label for="comment" class="form-label fw-bold text-muted">Comment (Optional)</label>
-                        <textarea class="form-control" id="comment" name="comment" rows="2" placeholder="Add a message for the receiver..."></textarea>
+                        <textarea class="form-control" id="comment" name="comment" rows="2"
+                                  placeholder="Add a message for the receiver..."><?php echo htmlspecialchars($_POST['comment'] ?? ''); ?></textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-success w-100 fw-bold">Confirm Transfer</button>
+                    <button type="submit" class="btn btn-success w-100 fw-bold">Preview Transfer →</button>
                 </form>
+
+                <div class="mt-3 text-center">
+                    <a href="history.php" class="text-muted small">View transfer history →</a>
+                </div>
             </div>
         </div>
     </div>
+
 </div>
+<?php endif; ?>
 
 <?php include '../includes/footer.php'; ?>
