@@ -53,8 +53,7 @@ $current_balance = $bal_result->fetch_assoc()['balance'];
 if (isset($_GET['search_query']) && !empty(trim($_GET['search_query']))) {
     $search_term = trim($_GET['search_query']);
     $search_like = "%" . $search_term . "%";
-    
-    // Search by username or user ID, but exclude the logged-in user from results
+
     $search_stmt = $conn->prepare("SELECT user_id, username FROM users WHERE (username LIKE ? OR user_id = ?) AND id != ? LIMIT 10");
     $search_stmt->bind_param("ssi", $search_like, $search_term, $user_db_id);
     $search_stmt->execute();
@@ -68,9 +67,8 @@ if (isset($_GET['search_query']) && !empty(trim($_GET['search_query']))) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST['amount'])) {
     $receiver_public_id = trim($_POST['receiver_id']);
     $amount = floatval($_POST['amount']);
-    $comment = trim($_POST['comment'] ?? ''); // Optional comment
+    $comment = trim($_POST['comment'] ?? '');
 
-    // Basic Validation
     if ($amount <= 0) {
         header("Location: index.php?status=invalid_amount");
         exit();
@@ -78,11 +76,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
         header("Location: index.php?status=self_transfer");
         exit();
     } elseif ($amount > $current_balance) {
-        // Prevent negative balance transactions
         header("Location: index.php?status=insufficient_funds");
         exit();
     } else {
-        // Check if receiver exists and get their internal DB ID
         $rec_stmt = $conn->prepare("SELECT id FROM users WHERE user_id = ?");
         $rec_stmt->bind_param("s", $receiver_public_id);
         $rec_stmt->execute();
@@ -94,65 +90,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
         } else {
             $receiver_db_id = $rec_result->fetch_assoc()['id'];
 
-            // ==========================================
-            // SECURE TRANSACTION BLOCK START
-            // ==========================================
             $conn->begin_transaction();
 
             try {
-                // Deduct from Sender
                 $deduct_stmt = $conn->prepare("UPDATE users SET balance = balance - ? WHERE id = ?");
                 $deduct_stmt->bind_param("di", $amount, $user_db_id);
                 $deduct_stmt->execute();
 
-                // Add to Receiver
                 $add_stmt = $conn->prepare("UPDATE users SET balance = balance + ? WHERE id = ?");
                 $add_stmt->bind_param("di", $amount, $receiver_db_id);
                 $add_stmt->execute();
 
-                // Record the Transaction Ledger
                 $tx_stmt = $conn->prepare("INSERT INTO transactions (sender_id, receiver_id, amount, comment) VALUES (?, ?, ?, ?)");
                 $tx_stmt->bind_param("iids", $user_db_id, $receiver_db_id, $amount, $comment);
                 $tx_stmt->execute();
 
-                // Commit the transaction (Make it permanent)
                 $conn->commit();
 
-                // Redirect on success
                 header("Location: index.php?status=success");
                 exit();
-                
+
             } catch (mysqli_sql_exception $exception) {
-                // If anything goes wrong, rollback to prevent lost money
                 $conn->rollback();
                 header("Location: index.php?status=error");
                 exit();
             }
-            // ==========================================
-            // SECURE TRANSACTION BLOCK END
-            // ==========================================
         }
     }
 }
 
-include '../includes/header.php'; 
+include '../includes/header.php';
 ?>
 
 <div class="row mt-4">
     <div class="col-md-12 mb-3">
-        <h2 class="fw-bold border-bottom pb-2">Money Transfer Operations</h2>
-        <p class="text-muted">Current Available Balance: <strong class="text-success fs-5">Rs. <?php echo number_format($current_balance, 2); ?></strong></p>
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+            <div>
+                <h2 class="fw-bold mb-0">Money Transfer Operations</h2>
+                <p class="text-muted mt-1 mb-0">
+                    Current Available Balance:
+                    <strong class="text-success fs-5">Rs. <?php echo number_format($current_balance, 2); ?></strong>
+                </p>
+            </div>
+            <a href="history.php" class="btn btn-dark">
+                📋 &nbsp;View Transaction History
+            </a>
+        </div>
     </div>
 </div>
 
 <?php if ($error): ?>
-    <div class="alert alert-danger fw-bold shadow-sm"><?php echo htmlspecialchars($error); ?></div>
+    <div class="alert alert-danger fw-bold shadow-sm mt-3"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
 <?php if ($success): ?>
-    <div class="alert alert-success fw-bold shadow-sm"><?php echo htmlspecialchars($success); ?></div>
+    <div class="alert alert-success fw-bold shadow-sm mt-3"><?php echo htmlspecialchars($success); ?></div>
 <?php endif; ?>
 
-<div class="row">
+<div class="row mt-3">
     <div class="col-md-5 mb-4">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-secondary text-white">
@@ -161,11 +155,14 @@ include '../includes/header.php';
             <div class="card-body bg-light">
                 <form action="index.php" method="GET" class="mb-3">
                     <div class="input-group">
-                        <input type="text" class="form-control" name="search_query" placeholder="Search by Username..." value="<?php echo isset($_GET['search_query']) ? htmlspecialchars($_GET['search_query']) : ''; ?>" required>
+                        <input type="text" class="form-control" name="search_query"
+                               placeholder="Search by Username..."
+                               value="<?php echo isset($_GET['search_query']) ? htmlspecialchars($_GET['search_query']) : ''; ?>"
+                               required>
                         <button class="btn btn-outline-secondary" type="submit">Search</button>
                     </div>
                 </form>
-                
+
                 <div class="list-group">
                     <?php if (isset($_GET['search_query'])): ?>
                         <?php if (count($search_results) > 0): ?>
@@ -176,7 +173,16 @@ include '../includes/header.php';
                                             <h6 class="mb-1 fw-bold"><?php echo htmlspecialchars($res['username']); ?></h6>
                                             <small class="text-muted">ID: <?php echo htmlspecialchars($res['user_id']); ?></small>
                                         </div>
-                                        <button class="btn btn-sm btn-primary" onclick="document.getElementById('receiver_id').value = '<?php echo htmlspecialchars($res['user_id']); ?>';">Select</button>
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-sm btn-primary"
+                                                    onclick="document.getElementById('receiver_id').value = '<?php echo htmlspecialchars($res['user_id']); ?>';">
+                                                Select
+                                            </button>
+                                            <a href="history.php?filter=all&search=<?php echo urlencode($res['username']); ?>"
+                                               class="btn btn-sm btn-outline-secondary" title="View transactions with this user">
+                                                📋 Transactions
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -198,17 +204,20 @@ include '../includes/header.php';
                 <form action="index.php" method="POST">
                     <div class="mb-3">
                         <label for="receiver_id" class="form-label fw-bold text-muted">Receiver User ID</label>
-                        <input type="text" class="form-control" id="receiver_id" name="receiver_id" placeholder="e.g., WAR-1234ABCD" required>
+                        <input type="text" class="form-control" id="receiver_id" name="receiver_id"
+                               placeholder="e.g., WAR-1234ABCD" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="amount" class="form-label fw-bold text-muted">Amount (Rs.)</label>
-                        <input type="number" class="form-control" id="amount" name="amount" min="1" step="0.01" placeholder="0.00" required>
+                        <input type="number" class="form-control" id="amount" name="amount"
+                               min="1" step="0.01" placeholder="0.00" required>
                     </div>
 
                     <div class="mb-4">
                         <label for="comment" class="form-label fw-bold text-muted">Comment (Optional)</label>
-                        <textarea class="form-control" id="comment" name="comment" rows="2" placeholder="Add a message for the receiver..."></textarea>
+                        <textarea class="form-control" id="comment" name="comment" rows="2"
+                                  placeholder="Add a message for the receiver..."></textarea>
                     </div>
 
                     <button type="submit" class="btn btn-success w-100 fw-bold">Confirm Transfer</button>
