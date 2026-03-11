@@ -18,4 +18,4 @@ if (session_status() === PHP_SESSION_NONE) {
 
 <?php include 'navbar.php'; ?>
 
-<div class="container mt-5">
+<div class="container">
