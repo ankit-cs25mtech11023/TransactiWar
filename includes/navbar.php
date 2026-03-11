@@ -1,3 +1,12 @@
+<style>
+    .navbar-brand {
+        font-family: 'Cinzel', serif;
+        font-size: 1.5rem;
+    }
+    .nav-link {
+        font-family: 'Cinzel', serif;
+    }
+</style>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="/index.php">TransactiWar</a>

@@ -104,121 +104,158 @@ $current_data = $stmt->get_result()->fetch_assoc();
 include '../includes/header.php'; 
 ?>
 
-<div style="display:flex;justify-content:center;margin-top:60px;">
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
-<div style="width:750px;background:white;border-radius:12px;
-box-shadow:0 8px 20px rgba(0,0,0,0.15);overflow:hidden;">
+    body {
+        background: linear-gradient(160deg, #f0ebe0 0%, #e8dfc9 50%, #ddd0b5 100%);
+        font-family: 'Inter', sans-serif;
+    }
+    .battle-page {
+        position: fixed;
+        inset: 0;
+        overflow-y: auto;
+        padding-top: 56px; /* Push content down to avoid navbar overlap */
+    }
+    .navbar {
+        position: relative;
+        z-index: 1030; /* Ensure navbar is on top */
+    }
+    .bg-scene {
+        position: absolute;
+        inset: 0;
+        width: 100%; height: 100%;
+        z-index: 1;
+        pointer-events: none;
+        opacity: 0.1;
+    }
+    .battle-page::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at 50% 60%, transparent 30%, rgba(80,55,25,0.22) 100%);
+        z-index: 2;
+        pointer-events: none;
+    }
+    .content-wrapper {
+        position: relative;
+        z-index: 10;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
 
-<div style="background:#34495e;color:white;padding:18px;
-text-align:center;font-size:22px;font-weight:bold;">
-Edit Profile
-</div>
+    .card {
+        background: rgba(255,253,248,0.94);
+        border: 1px solid rgba(170,145,100,0.22);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05), 0 14px 44px rgba(0,0,0,0.12);
+    }
+    .card-header {
+        background: #1c1c1c;
+        color: #f0e8d8;
+        font-family: 'Cinzel', serif;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        font-size: 0.9rem;
+    }
+    .btn-light {
+        background: #f0e8d8;
+        color: #1c1c1c;
+        font-family: 'Cinzel', serif;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        border: none;
+        transition: background 0.2s, transform 0.1s;
+    }
+    .btn-light:hover {
+        background: #fff;
+        transform: translateY(-1px);
+    }
+    .btn-dark {
+        background: #1c1c1c;
+        color: #f0e8d8;
+        font-family: 'Cinzel', serif;
+    }
+    .btn-dark:hover {
+        background: #8b2500;
+    }
+</style>
+<div class="battle-page">
+<svg class="bg-scene" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="720" cy="580" rx="900" ry="260" fill="#7a3e00" opacity="0.4"/>
+    <polygon points="0,430 170,210 340,430" fill="#5a3010"/>
+    <polygon points="220,430 430,165 640,430" fill="#4a2808"/>
+    <polygon points="490,430 700,185 910,430" fill="#5a3010"/>
+    <polygon points="800,430 1020,155 1240,430" fill="#4a2808"/>
+    <polygon points="1100,430 1300,210 1440,380 1440,430" fill="#5a3010"/>
+    <rect x="0" y="430" width="1440" height="170" fill="#2e1800"/>
+    </g>
+  </svg>
+    <div class="container content-wrapper">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        Edit Profile
+                    </div>
+                    <div class="card-body p-4">
+                        <?php if ($error): ?>
+                        <div class="alert alert-danger fw-bold"><?php echo htmlspecialchars($error); ?></div>
+                        <?php endif; ?>
 
-<div style="padding:40px;">
+                        <?php if ($success): ?>
+                        <div class="alert alert-success fw-bold"><?php echo htmlspecialchars($success); ?></div>
+                        <?php endif; ?>
 
-<?php if ($error): ?>
-<div class="alert alert-danger fw-bold"><?php echo htmlspecialchars($error); ?></div>
-<?php endif; ?>
-
-<?php if ($success): ?>
-<div class="alert alert-success fw-bold"><?php echo htmlspecialchars($success); ?></div>
-<?php endif; ?>
-
-<form action="edit.php" method="POST" enctype="multipart/form-data">
-
-<div style="display:flex;gap:30px;align-items:center;">
-
-<div style="text-align:center;">
-
-<img id="preview"
-src="avatar.php"
-style="width:150px;height:150px;border-radius:50%;
-object-fit:cover;border:4px solid #ddd;margin-bottom:10px;">
-
-<p style="font-size:13px;color:#777;margin-bottom:6px;">
-Upload New Image
-</p>
-
-<input type="file"
-name="profile_img"
-accept="image/png, image/jpeg, image/gif"
-onchange="previewImage(event)">
-
-</div>
-
-<div style="flex:1;">
-
-<label style="font-weight:bold;">Username</label>
-
-<input type="text"
-value="<?php echo htmlspecialchars($current_data['username']); ?>"
-readonly
-style="width:100%;padding:10px;margin-top:5px;margin-bottom:15px;
-border-radius:6px;border:1px solid #ccc;background:#f3f3f3;">
-
-<label style="font-weight:bold;">Email</label>
-
-<input type="email"
-name="email"
-value="<?php echo htmlspecialchars($current_data['email']); ?>"
-required
-style="width:100%;padding:10px;margin-top:5px;
-border-radius:6px;border:1px solid #ccc;">
-
-</div>
-
-</div>
-
-<div style="margin-top:25px;">
-
-<label style="font-weight:bold;">Biography</label>
-
-<textarea id="bio"
-name="biography"
-maxlength="1000"
-onkeyup="updateCounter()"
-style="width:100%;height:120px;padding:10px;margin-top:5px;
-border-radius:6px;border:1px solid #ccc;"><?php echo htmlspecialchars($current_data['biography'] ?? ''); ?></textarea>
-
-<p style="font-size:13px;color:#666;margin-top:5px;">
-Characters remaining:
-<span id="counter">1000</span>
-</p>
-
-</div>
-
-<button type="submit"
-style="margin-top:25px;width:100%;background:#3498db;color:white;
-padding:12px;border:none;border-radius:6px;font-size:16px;font-weight:bold;cursor:pointer;">
-Save Changes
-</button>
-
-</form>
-
-</div>
-
-</div>
-
+                        <form action="edit.php" method="POST" enctype="multipart/form-data">
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <img id="preview" src="avatar.php" class="img-fluid rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover; border: 4px solid #ddd;">
+                                    <label for="profile_img" class="form-label">Upload New Image</label>
+                                    <input type="file" class="form-control" name="profile_img" id="profile_img" accept="image/png, image/jpeg, image/gif" onchange="previewImage(event)">
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label class="form-label">Username</label>
+                                        <input type="text" class="form-control" value="<?php echo htmlspecialchars($current_data['username']); ?>" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" class="form-control" name="email" value="<?php echo htmlspecialchars($current_data['email']); ?>" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <label for="bio" class="form-label">Biography</label>
+                                <textarea id="bio" name="biography" class="form-control" maxlength="1000" onkeyup="updateCounter()" rows="4"><?php echo htmlspecialchars($current_data['biography'] ?? ''); ?></textarea>
+                                <p class="form-text">Characters remaining: <span id="counter">1000</span></p>
+                            </div>
+                            <button type="submit" class="btn btn-dark w-100 mt-3">Save Changes</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
-
 function previewImage(event){
-const reader = new FileReader();
-reader.onload = function(){
-document.getElementById('preview').src = reader.result;
-};
-reader.readAsDataURL(event.target.files[0]);
+    const reader = new FileReader();
+    reader.onload = function(){
+        document.getElementById('preview').src = reader.result;
+    };
+    reader.readAsDataURL(event.target.files[0]);
 }
 
 function updateCounter(){
-let max = 1000;
-let current = document.getElementById("bio").value.length;
-document.getElementById("counter").innerText = max-current;
+    let max = 1000;
+    let current = document.getElementById("bio").value.length;
+    document.getElementById("counter").innerText = max-current;
 }
 
 updateCounter();
-
 </script>
 
 <?php include '../includes/footer.php'; ?>

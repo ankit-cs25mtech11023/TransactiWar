@@ -1,104 +1,36 @@
-<?php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
-
-// The Traffic Cop Logic: If logged in, go straight to the dashboard
-if (isset($_SESSION['user_id'])) {
-    header("Location: /dashboard/index.php");
-    exit();
-}
-
-include 'includes/header.php'; 
-?>
-
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
-    body {
-        background: linear-gradient(160deg, #f0ebe0 0%, #e8dfc9 50%, #ddd0b5 100%);
-        font-family: 'Inter', sans-serif;
-    }
-    .battle-page {
-        position: fixed;
-        inset: 0;
-        overflow-y: auto;
-        padding-top: 56px; /* Push content down to avoid navbar overlap */
-    }
-    .navbar {
-        position: relative;
-        z-index: 1030; /* Ensure navbar is on top */
-    }
-    .bg-scene {
-        position: absolute;
-        inset: 0;
-        width: 100%; height: 100%;
-        z-index: 1;
-        pointer-events: none;
-        opacity: 0.1;
-    }
-    .battle-page::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(ellipse at 50% 60%, transparent 30%, rgba(80,55,25,0.22) 100%);
-        z-index: 2;
-        pointer-events: none;
-    }
-    .content-wrapper {
-        position: relative;
-        z-index: 10;
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
+  .battle-page {
+    position: fixed;
+    top: 56px; /* below navbar */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+    background: linear-gradient(160deg, #f0ebe0 0%, #e8dfc9 50%, #ddd0b5 100%);
+    z-index: 10;
+  }
 
-    .card {
-        background: rgba(255,253,248,0.94);
-        border: 1px solid rgba(170,145,100,0.22);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05), 0 14px 44px rgba(0,0,0,0.12);
-    }
-    .card-header {
-        background: #1c1c1c;
-        color: #f0e8d8;
-        font-family: 'Cinzel', serif;
-        font-weight: 600;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        font-size: 0.9rem;
-    }
-    .welcome-card {
-        background: #1c1c1c !important;
-        font-family: 'Cinzel', serif;
-        border: 1px solid rgba(170,145,100,0.22);
-    }
-    .welcome-card h1, .welcome-card h5 {
-        color: #f0e8d8;
-        text-shadow: 0 2px 15px rgba(0,0,0,0.3);
-    }
-    .btn-light {
-        background: #f0e8d8;
-        color: #1c1c1c;
-        font-family: 'Cinzel', serif;
-        font-weight: 600;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        border: none;
-        transition: background 0.2s, transform 0.1s;
-    }
-    .btn-light:hover {
-        background: #fff;
-        transform: translateY(-1px);
-    }
-    .btn-dark {
-        background: #1c1c1c;
-        color: #f0e8d8;
-        font-family: 'Cinzel', serif;
-    }
-    .btn-dark:hover {
-        background: #8b2500;
-    }
+  .bg-scene {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.1;
+  }
+
+  .battle-page::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 60%, transparent 30%, rgba(80,55,25,0.22) 100%);
+    z-index: -1;
+    pointer-events: none;
+  }
 </style>
-
-<div class="battle-page">
-    <svg class="bg-scene" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+<svg class="bg-scene" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
     <ellipse cx="720" cy="580" rx="900" ry="260" fill="#7a3e00" opacity="0.4"/>
     <polygon points="0,430 170,210 340,430" fill="#5a3010"/>
     <polygon points="220,430 430,165 640,430" fill="#4a2808"/>
@@ -170,21 +102,4 @@ include 'includes/header.php';
       <rect x="1312" y="383" width="10" height="50"/><circle cx="1317" cy="378" r="7"/><rect x="1320" y="348" width="2" height="32"/>
       <rect x="1341" y="385" width="10" height="48"/><circle cx="1346" cy="380" r="7"/><rect x="1349" y="350" width="2" height="32"/>
     </g>
-  </svg>
-    <div class="container content-wrapper d-flex align-items-center justify-content-center" style="min-height: 100%;">
-        <div class="col-md-8 text-center">
-            <div class="card welcome-card p-5">
-                <h1 class="display-4 fw-bold">TransactiWar</h1>
-                <p class="lead text-white-50">Battle for Security, Compete for Supremacy.</p>
-                <hr class="my-4 border-white-50">
-                <p class="text-white-50">Enlist now to receive your starting balance of Rs. 100 and prepare your defenses.</p>
-                <div class="mt-4">
-                    <a href="/auth/register.php" class="btn btn-light btn-lg me-2">Register Now</a>
-                    <a href="/auth/login.php" class="btn btn-outline-light btn-lg">Login</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<?php include 'includes/footer.php'; ?>
+</svg>

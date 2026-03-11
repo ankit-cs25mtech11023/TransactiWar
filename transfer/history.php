@@ -86,121 +86,212 @@ function pageUrl(string $filter, string $search): string {
 include '../includes/header.php';
 ?>
 
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-4">
-            <h2 class="fw-bold mb-0">Transaction Ledger</h2>
-            <a href="index.php" class="btn btn-sm btn-primary">+ New Transfer</a>
-        </div>
-    </div>
-</div>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
-<!-- Summary Stats -->
-<div class="row mb-4">
-    <div class="col-md-4 mb-2">
-        <div class="card border-0 shadow-sm text-center py-3">
-            <div class="text-muted small fw-bold text-uppercase">Total Transactions</div>
-            <div class="fs-4 fw-bold text-primary"><?php echo number_format($transactions->num_rows); ?></div>
-        </div>
-    </div>
-    <div class="col-md-4 mb-2">
-        <div class="card border-0 shadow-sm text-center py-3">
-            <div class="text-muted small fw-bold text-uppercase">Total Sent</div>
-            <div class="fs-4 fw-bold text-danger">Rs. <?php echo number_format($stats['total_sent'] ?? 0, 2); ?></div>
-        </div>
-    </div>
-    <div class="col-md-4 mb-2">
-        <div class="card border-0 shadow-sm text-center py-3">
-            <div class="text-muted small fw-bold text-uppercase">Total Received</div>
-            <div class="fs-4 fw-bold text-success">Rs. <?php echo number_format($stats['total_received'] ?? 0, 2); ?></div>
-        </div>
-    </div>
-</div>
+    body {
+        background: linear-gradient(160deg, #f0ebe0 0%, #e8dfc9 50%, #ddd0b5 100%);
+        font-family: 'Inter', sans-serif;
+    }
+    .battle-page {
+        position: fixed;
+        inset: 0;
+        overflow-y: auto;
+        padding-top: 56px; /* Push content down to avoid navbar overlap */
+    }
+    .navbar {
+        position: relative;
+        z-index: 1030; /* Ensure navbar is on top */
+    }
+    .bg-scene {
+        position: absolute;
+        inset: 0;
+        width: 100%; height: 100%;
+        z-index: 1;
+        pointer-events: none;
+        opacity: 0.1;
+    }
+    .battle-page::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at 50% 60%, transparent 30%, rgba(80,55,25,0.22) 100%);
+        z-index: 2;
+        pointer-events: none;
+    }
+    .content-wrapper {
+        position: relative;
+        z-index: 10;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
 
-<!-- Filters & Search -->
-<div class="row mb-3">
-    <div class="col-md-6 mb-2">
-        <div class="btn-group" role="group">
-            <a href="<?php echo pageUrl('all', $search); ?>"
-               class="btn btn-sm <?php echo $filter === 'all'      ? 'btn-dark'    : 'btn-outline-secondary'; ?>">All</a>
-            <a href="<?php echo pageUrl('sent', $search); ?>"
-               class="btn btn-sm <?php echo $filter === 'sent'     ? 'btn-danger'  : 'btn-outline-secondary'; ?>">Sent</a>
-            <a href="<?php echo pageUrl('received', $search); ?>"
-               class="btn btn-sm <?php echo $filter === 'received' ? 'btn-success' : 'btn-outline-secondary'; ?>">Received</a>
-        </div>
-    </div>
-    <div class="col-md-6 mb-2">
-        <form method="GET" action="history.php">
-            <input type="hidden" name="filter" value="<?php echo htmlspecialchars($filter); ?>">
-            <div class="input-group input-group-sm">
-                <input type="text" class="form-control" name="search"
-                       placeholder="Search by user or note…"
-                       value="<?php echo htmlspecialchars($search); ?>">
-                <button class="btn btn-outline-secondary" type="submit">Search</button>
-                <?php if ($search): ?>
-                    <a href="<?php echo pageUrl($filter, ''); ?>" class="btn btn-outline-danger">✕</a>
-                <?php endif; ?>
+    .card {
+        background: rgba(255,253,248,0.94);
+        border: 1px solid rgba(170,145,100,0.22);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05), 0 14px 44px rgba(0,0,0,0.12);
+    }
+    .card-header {
+        background: #1c1c1c;
+        color: #f0e8d8;
+        font-family: 'Cinzel', serif;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        font-size: 0.9rem;
+    }
+    .btn-light {
+        background: #f0e8d8;
+        color: #1c1c1c;
+        font-family: 'Cinzel', serif;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        border: none;
+        transition: background 0.2s, transform 0.1s;
+    }
+    .btn-light:hover {
+        background: #fff;
+        transform: translateY(-1px);
+    }
+    .btn-dark {
+        background: #1c1c1c;
+        color: #f0e8d8;
+        font-family: 'Cinzel', serif;
+    }
+    .btn-dark:hover {
+        background: #8b2500;
+    }
+</style>
+<div class="battle-page">
+<svg class="bg-scene" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="720" cy="580" rx="900" ry="260" fill="#7a3e00" opacity="0.4"/>
+    <polygon points="0,430 170,210 340,430" fill="#5a3010"/>
+    <polygon points="220,430 430,165 640,430" fill="#4a2808"/>
+    <polygon points="490,430 700,185 910,430" fill="#5a3010"/>
+    <polygon points="800,430 1020,155 1240,430" fill="#4a2808"/>
+    <polygon points="1100,430 1300,210 1440,380 1440,430" fill="#5a3010"/>
+    <rect x="0" y="430" width="1440" height="170" fill="#2e1800"/>
+    </g>
+  </svg>
+    <div class="container content-wrapper">
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-4">
+                    <h2 class="fw-bold mb-0">Transaction Ledger</h2>
+                    <a href="index.php" class="btn btn-sm btn-light">+ New Transfer</a>
+                </div>
             </div>
-        </form>
-    </div>
-</div>
+        </div>
 
-<!-- Table -->
-<div class="row">
-    <div class="col-md-12">
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-0">
-                <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
-                    <table class="table table-hover table-striped mb-0">
-                        <thead class="table-dark sticky-top">
-                            <tr>
-                                <th>Date & Time</th>
-                                <th>Type</th>
-                                <th>Counterparty (ID)</th>
-                                <th>Amount</th>
-                                <th>Comment</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if ($transactions->num_rows > 0): ?>
-                                <?php while ($tx = $transactions->fetch_assoc()):
-                                    $is_sender        = ($tx['sender_id'] == $user_db_id);
-                                    $tx_type          = $is_sender ? 'Sent' : 'Received';
-                                    $badge_class      = $is_sender ? 'bg-danger' : 'bg-success';
-                                    $amount_class     = $is_sender ? 'text-danger' : 'text-success';
-                                    $sign             = $is_sender ? '−' : '+';
-                                    $counterparty_name = $is_sender ? $tx['receiver_name'] : $tx['sender_name'];
-                                    $counterparty_id  = $is_sender ? $tx['receiver_public_id'] : $tx['sender_public_id'];
-                                    $date             = date('M j, Y H:i', strtotime($tx['created_at']));
-                                    $comment          = !empty($tx['comment'])
-                                        ? '"' . htmlspecialchars($tx['comment']) . '"'
-                                        : '<span class="text-muted small">No comment</span>';
-                                ?>
-                                <tr>
-                                    <td class="align-middle"><?php echo $date; ?></td>
-                                    <td class="align-middle">
-                                        <span class="badge <?php echo $badge_class; ?>"><?php echo $tx_type; ?></span>
-                                    </td>
-                                    <td class="align-middle fw-bold">
-                                        <?php echo htmlspecialchars($counterparty_name); ?>
-                                        <small class="text-muted d-block">(<?php echo htmlspecialchars($counterparty_id); ?>)</small>
-                                    </td>
-                                    <td class="align-middle fw-bold <?php echo $amount_class; ?>">
-                                        <?php echo $sign; ?> Rs. <?php echo number_format($tx['amount'], 2); ?>
-                                    </td>
-                                    <td class="align-middle fst-italic text-muted"><?php echo $comment; ?></td>
-                                </tr>
-                                <?php endwhile; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-5">
-                                        <p class="mb-0">No transactions found<?php echo $search ? " for \"" . htmlspecialchars($search) . "\"" : ''; ?>.</p>
-                                        <?php if (!$search): ?><small>Your ledger is completely empty.</small><?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+        <!-- Summary Stats -->
+        <div class="row mb-4">
+            <div class="col-md-4 mb-2">
+                <div class="card border-0 shadow-sm text-center py-3">
+                    <div class="text-muted small fw-bold text-uppercase">Total Transactions</div>
+                    <div class="fs-4 fw-bold text-primary"><?php echo number_format($transactions->num_rows); ?></div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <div class="card border-0 shadow-sm text-center py-3">
+                    <div class="text-muted small fw-bold text-uppercase">Total Sent</div>
+                    <div class="fs-4 fw-bold text-danger">Rs. <?php echo number_format($stats['total_sent'] ?? 0, 2); ?></div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <div class="card border-0 shadow-sm text-center py-3">
+                    <div class="text-muted small fw-bold text-uppercase">Total Received</div>
+                    <div class="fs-4 fw-bold text-success">Rs. <?php echo number_format($stats['total_received'] ?? 0, 2); ?></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters & Search -->
+        <div class="row mb-3">
+            <div class="col-md-6 mb-2">
+                <div class="btn-group" role="group">
+                    <a href="<?php echo pageUrl('all', $search); ?>"
+                       class="btn btn-sm <?php echo $filter === 'all'      ? 'btn-dark'    : 'btn-outline-dark'; ?>">All</a>
+                    <a href="<?php echo pageUrl('sent', $search); ?>"
+                       class="btn btn-sm <?php echo $filter === 'sent'     ? 'btn-dark'  : 'btn-outline-dark'; ?>">Sent</a>
+                    <a href="<?php echo pageUrl('received', $search); ?>"
+                       class="btn btn-sm <?php echo $filter === 'received' ? 'btn-dark' : 'btn-outline-dark'; ?>">Received</a>
+                </div>
+            </div>
+            <div class="col-md-6 mb-2">
+                <form method="GET" action="history.php">
+                    <input type="hidden" name="filter" value="<?php echo htmlspecialchars($filter); ?>">
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" name="search"
+                               placeholder="Search by user or note…"
+                               value="<?php echo htmlspecialchars($search); ?>">
+                        <button class="btn btn-dark" type="submit">Search</button>
+                        <?php if ($search): ?>
+                            <a href="<?php echo pageUrl($filter, ''); ?>" class="btn btn-outline-danger">✕</a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead class="table-dark sticky-top">
+                                    <tr>
+                                        <th>Date & Time</th>
+                                        <th>Type</th>
+                                        <th>Counterparty (ID)</th>
+                                        <th>Amount</th>
+                                        <th>Comment</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if ($transactions->num_rows > 0): ?>
+                                        <?php while ($tx = $transactions->fetch_assoc()):
+                                            $is_sender        = ($tx['sender_id'] == $user_db_id);
+                                            $tx_type          = $is_sender ? 'Sent' : 'Received';
+                                            $badge_class      = $is_sender ? 'bg-danger' : 'bg-success';
+                                            $amount_class     = $is_sender ? 'text-danger' : 'text-success';
+                                            $sign             = $is_sender ? '−' : '+';
+                                            $counterparty_name = $is_sender ? $tx['receiver_name'] : $tx['sender_name'];
+                                            $counterparty_id  = $is_sender ? $tx['receiver_public_id'] : $tx['sender_public_id'];
+                                            $date             = date('M j, Y H:i', strtotime($tx['created_at']));
+                                            $comment          = !empty($tx['comment'])
+                                                ? '"' . htmlspecialchars($tx['comment']) . '"'
+                                                : '<span class="text-muted small">No comment</span>';
+                                        ?>
+                                        <tr>
+                                            <td class="align-middle"><?php echo $date; ?></td>
+                                            <td class="align-middle">
+                                                <span class="badge <?php echo $badge_class; ?>"><?php echo $tx_type; ?></span>
+                                            </td>
+                                            <td class="align-middle fw-bold">
+                                                <?php echo htmlspecialchars($counterparty_name); ?>
+                                                <small class="text-muted d-block">(<?php echo htmlspecialchars($counterparty_id); ?>)</small>
+                                            </td>
+                                            <td class="align-middle fw-bold <?php echo $amount_class; ?>">
+                                                <?php echo $sign; ?> Rs. <?php echo number_format($tx['amount'], 2); ?>
+                                            </td>
+                                            <td class="align-middle fst-italic text-muted"><?php echo $comment; ?></td>
+                                        </tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-5">
+                                                <p class="mb-0">No transactions found<?php echo $search ? " for \"" . htmlspecialchars($search) . "\"" : ''; ?>.</p>
+                                                <?php if (!$search): ?><small>Your ledger is completely empty.</small><?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
