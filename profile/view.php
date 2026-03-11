@@ -188,7 +188,7 @@ include '../includes/header.php';
 <?php echo htmlspecialchars($error); ?>
 </h3>
 
-<a href="../transfer/index.php"
+<a href="../dashboard/index.php"
 class="btn btn-dark">
 Return to Search
 </a>
