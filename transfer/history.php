@@ -22,9 +22,6 @@ $log_stmt->execute();
 // 2. Filters
 $filter = $_GET['filter'] ?? 'all';   // all | sent | received
 $search = trim($_GET['search'] ?? '');
-$page   = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 10;
-$offset  = ($page - 1) * $perPage;
 
 // 3. Build WHERE clause
 $conditions = ["(t.sender_id = ? OR t.receiver_id = ?)"];
@@ -52,20 +49,7 @@ if ($search !== '') {
 
 $whereSQL = "WHERE " . implode(" AND ", $conditions);
 
-// 4. Total count for pagination
-$countSQL = "SELECT COUNT(*) AS c
-             FROM transactions t
-             JOIN users s ON t.sender_id   = s.id
-             JOIN users r ON t.receiver_id = r.id
-             $whereSQL";
-$cs = $conn->prepare($countSQL);
-$cs->bind_param($types, ...$params);
-$cs->execute();
-$totalRows  = $cs->get_result()->fetch_assoc()['c'];
-$cs->close();
-$totalPages = max(1, ceil($totalRows / $perPage));
-
-// 5. Fetch Transaction Ledger with JOINs
+// 4. Fetch Transaction Ledger with JOINs
 $query = "
     SELECT t.amount, t.comment, t.created_at, t.sender_id, t.receiver_id,
            s.username AS sender_name,   s.user_id AS sender_public_id,
@@ -75,19 +59,17 @@ $query = "
     JOIN users r ON t.receiver_id = r.id
     $whereSQL
     ORDER BY t.created_at DESC
-    LIMIT ? OFFSET ?
 ";
-$allParams = array_merge($params, [$perPage, $offset]);
-$allTypes  = $types . "ii";
 $stmt = $conn->prepare($query);
-$stmt->bind_param($allTypes, ...$allParams);
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
 $stmt->execute();
 $transactions = $stmt->get_result();
 
-// 6. Summary stats
+// 5. Summary stats
 $stats_stmt = $conn->prepare("
     SELECT
-        COUNT(*) AS total,
         SUM(CASE WHEN sender_id   = ? THEN amount ELSE 0 END) AS total_sent,
         SUM(CASE WHEN receiver_id = ? THEN amount ELSE 0 END) AS total_received
     FROM transactions
@@ -97,8 +79,8 @@ $stats_stmt->bind_param("iiii", $user_db_id, $user_db_id, $user_db_id, $user_db_
 $stats_stmt->execute();
 $stats = $stats_stmt->get_result()->fetch_assoc();
 
-function pageUrl(int $p, string $filter, string $search): string {
-    return "history.php?" . http_build_query(['filter' => $filter, 'search' => $search, 'page' => $p]);
+function pageUrl(string $filter, string $search): string {
+    return "history.php?" . http_build_query(['filter' => $filter, 'search' => $search]);
 }
 
 include '../includes/header.php';
@@ -118,7 +100,7 @@ include '../includes/header.php';
     <div class="col-md-4 mb-2">
         <div class="card border-0 shadow-sm text-center py-3">
             <div class="text-muted small fw-bold text-uppercase">Total Transactions</div>
-            <div class="fs-4 fw-bold text-primary"><?php echo number_format($stats['total']); ?></div>
+            <div class="fs-4 fw-bold text-primary"><?php echo number_format($transactions->num_rows); ?></div>
         </div>
     </div>
     <div class="col-md-4 mb-2">
@@ -139,25 +121,24 @@ include '../includes/header.php';
 <div class="row mb-3">
     <div class="col-md-6 mb-2">
         <div class="btn-group" role="group">
-            <a href="<?php echo pageUrl($page, 'all', $search); ?>"
+            <a href="<?php echo pageUrl('all', $search); ?>"
                class="btn btn-sm <?php echo $filter === 'all'      ? 'btn-dark'    : 'btn-outline-secondary'; ?>">All</a>
-            <a href="<?php echo pageUrl($page, 'sent', $search); ?>"
+            <a href="<?php echo pageUrl('sent', $search); ?>"
                class="btn btn-sm <?php echo $filter === 'sent'     ? 'btn-danger'  : 'btn-outline-secondary'; ?>">Sent</a>
-            <a href="<?php echo pageUrl($page, 'received', $search); ?>"
+            <a href="<?php echo pageUrl('received', $search); ?>"
                class="btn btn-sm <?php echo $filter === 'received' ? 'btn-success' : 'btn-outline-secondary'; ?>">Received</a>
         </div>
     </div>
     <div class="col-md-6 mb-2">
         <form method="GET" action="history.php">
             <input type="hidden" name="filter" value="<?php echo htmlspecialchars($filter); ?>">
-            <input type="hidden" name="page"   value="1">
             <div class="input-group input-group-sm">
                 <input type="text" class="form-control" name="search"
                        placeholder="Search by user or note…"
                        value="<?php echo htmlspecialchars($search); ?>">
                 <button class="btn btn-outline-secondary" type="submit">Search</button>
                 <?php if ($search): ?>
-                    <a href="<?php echo pageUrl(1, $filter, ''); ?>" class="btn btn-outline-danger">✕</a>
+                    <a href="<?php echo pageUrl($filter, ''); ?>" class="btn btn-outline-danger">✕</a>
                 <?php endif; ?>
             </div>
         </form>
@@ -169,9 +150,9 @@ include '../includes/header.php';
     <div class="col-md-12">
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
                     <table class="table table-hover table-striped mb-0">
-                        <thead class="table-dark">
+                        <thead class="table-dark sticky-top">
                             <tr>
                                 <th>Date & Time</th>
                                 <th>Type</th>
@@ -222,32 +203,6 @@ include '../includes/header.php';
                     </table>
                 </div>
             </div>
-
-            <!-- Pagination -->
-            <?php if ($totalPages > 1): ?>
-            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
-                <small class="text-muted">
-                    Page <?php echo $page; ?> of <?php echo $totalPages; ?>
-                    &nbsp;(<?php echo $totalRows; ?> records)
-                </small>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="<?php echo pageUrl($page - 1, $filter, $search); ?>">‹</a>
-                        </li>
-                        <?php for ($p = 1; $p <= $totalPages; $p++): ?>
-                        <li class="page-item <?php echo $p === $page ? 'active' : ''; ?>">
-                            <a class="page-link" href="<?php echo pageUrl($p, $filter, $search); ?>"><?php echo $p; ?></a>
-                        </li>
-                        <?php endfor; ?>
-                        <li class="page-item <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="<?php echo pageUrl($page + 1, $filter, $search); ?>">›</a>
-                        </li>
-                    </ul>
-                </nav>
-            </div>
-            <?php endif; ?>
-
         </div>
     </div>
 </div>
