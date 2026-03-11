@@ -25,55 +25,64 @@ $log_stmt->execute();
 
 // 2. Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     $new_email = trim($_POST['email']);
     $new_bio = trim($_POST['biography']);
-    
-    // Update Email in users table
+
+    // Update Email
     $update_user = $conn->prepare("UPDATE users SET email = ? WHERE id = ?");
     $update_user->bind_param("si", $new_email, $user_db_id);
     $update_user->execute();
 
-    // Update Biography in profiles table
+    // Update Biography
     $update_bio = $conn->prepare("UPDATE profiles SET biography = ? WHERE user_id = ?");
     $update_bio->bind_param("si", $new_bio, $user_db_id);
     $update_bio->execute();
 
-    // 3. SECURE IMAGE UPLOAD LOGIC
+    // SECURE IMAGE UPLOAD
     if (isset($_FILES['profile_img']) && $_FILES['profile_img']['error'] === UPLOAD_ERR_OK) {
+
         $file_tmp_path = $_FILES['profile_img']['tmp_name'];
         $file_name = $_FILES['profile_img']['name'];
         $file_size = $_FILES['profile_img']['size'];
-        
-        // Ensure the uploads directory exists
+
         $upload_dir = '../assets/uploads/';
+
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0755, true);
         }
 
-        // Validate File Type (Security against PHP shell uploads)
-        $allowed_mime_types = ['image/jpeg', 'image/png', 'image/gif'];
+        $allowed_mime_types = ['image/jpeg','image/png','image/gif'];
         $file_mime_type = mime_content_type($file_tmp_path);
-        
-        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+
+        $allowed_extensions = ['jpg','jpeg','png','gif'];
         $file_extension = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
 
-        if (!in_array($file_mime_type, $allowed_mime_types) || !in_array($file_extension, $allowed_extensions)) {
-            $error = "Security Alert: Invalid file format. Only JPG, PNG, and GIF are allowed.";
-        } elseif ($file_size > 2000000) { // Limit to 2MB
-            $error = "File is too large. Maximum size is 2MB.";
+        if (!in_array($file_mime_type,$allowed_mime_types) || !in_array($file_extension,$allowed_extensions)) {
+
+            $error = "Security Alert: Invalid file format.";
+
+        } elseif ($file_size > 2000000) {
+
+            $error = "File too large (Max 2MB).";
+
         } else {
-            // Generate a secure, unique filename so users can't overwrite each other's files
+
             $new_file_name = $user_public_id . '_' . time() . '.' . $file_extension;
             $destination_path = $upload_dir . $new_file_name;
 
-            if (move_uploaded_file($file_tmp_path, $destination_path)) {
-                // Save the path to the database
+            if (move_uploaded_file($file_tmp_path,$destination_path)) {
+
                 $db_image_path = '../assets/uploads/' . $new_file_name;
+
                 $update_img = $conn->prepare("UPDATE profiles SET profile_image_path = ? WHERE user_id = ?");
-                $update_img->bind_param("si", $db_image_path, $user_db_id);
+                $update_img->bind_param("si",$db_image_path,$user_db_id);
                 $update_img->execute();
+
             } else {
-                $error = "There was an error moving the uploaded file. Check folder permissions.";
+
+                $error = "Error uploading file.";
+
             }
         }
     }
@@ -83,11 +92,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 4. Fetch Current User Data to populate the HTML form
+// Fetch current user data
 $query = "SELECT u.username, u.email, p.biography, p.profile_image_path 
           FROM users u 
           LEFT JOIN profiles p ON u.id = p.user_id 
           WHERE u.id = ?";
+
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $user_db_id);
 $stmt->execute();
@@ -96,54 +106,121 @@ $current_data = $stmt->get_result()->fetch_assoc();
 include '../includes/header.php'; 
 ?>
 
-<div class="row justify-content-center mt-5">
-    <div class="col-md-8">
-        
-        <?php if ($error): ?>
-            <div class="alert alert-danger fw-bold shadow-sm"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
-        <?php if ($success): ?>
-            <div class="alert alert-success fw-bold shadow-sm"><?php echo htmlspecialchars($success); ?></div>
-        <?php endif; ?>
+<div style="display:flex;justify-content:center;margin-top:60px;">
 
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-dark text-white text-center">
-                <h4 class="mb-0">Edit Profile</h4>
-            </div>
-            <div class="card-body p-4">
-                <form action="edit.php" method="POST" enctype="multipart/form-data">
-                    <div class="row">
-                        <div class="col-md-4 text-center mb-3">
-                            <img src="<?php echo htmlspecialchars($current_data['profile_image_path']); ?>" alt="Profile Image" class="img-thumbnail rounded-circle mb-2 shadow-sm" style="width: 150px; height: 150px; object-fit: cover;">
-                            <div class="mb-3">
-                                <label for="profile_img" class="form-label text-muted fw-bold small">Upload New Image</label>
-                                <input class="form-control form-control-sm" type="file" id="profile_img" name="profile_img" accept="image/png, image/jpeg, image/gif">
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-8">
-                            <div class="mb-3">
-                                <label for="username" class="form-label text-muted fw-bold">Username</label>
-                                <input type="text" class="form-control bg-light" id="username" name="username" value="<?php echo htmlspecialchars($current_data['username']); ?>" readonly>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="email" class="form-label text-muted fw-bold">Email address</label>
-                                <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($current_data['email']); ?>" required>
-                            </div>
-                        </div>
-                    </div>
+<div style="width:750px;background:white;border-radius:12px;
+box-shadow:0 8px 20px rgba(0,0,0,0.15);overflow:hidden;">
 
-                    <div class="mb-4">
-                        <label for="biography" class="form-label text-muted fw-bold">Biography</label>
-                        <textarea class="form-control" id="biography" name="biography" rows="5" placeholder="Tell us about yourself..."><?php echo htmlspecialchars($current_data['biography'] ?? ''); ?></textarea>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">Save Changes</button>
-                </form>
-            </div>
-        </div>
-    </div>
+<div style="background:#34495e;color:white;padding:18px;
+text-align:center;font-size:22px;font-weight:bold;">
+Edit Profile
 </div>
+
+<div style="padding:40px;">
+
+<?php if ($error): ?>
+<div class="alert alert-danger fw-bold"><?php echo htmlspecialchars($error); ?></div>
+<?php endif; ?>
+
+<?php if ($success): ?>
+<div class="alert alert-success fw-bold"><?php echo htmlspecialchars($success); ?></div>
+<?php endif; ?>
+
+<form action="edit.php" method="POST" enctype="multipart/form-data">
+
+<div style="display:flex;gap:30px;align-items:center;">
+
+<div style="text-align:center;">
+
+<img id="preview"
+src="<?php echo htmlspecialchars($current_data['profile_image_path']); ?>"
+style="width:150px;height:150px;border-radius:50%;
+object-fit:cover;border:4px solid #ddd;margin-bottom:10px;">
+
+<p style="font-size:13px;color:#777;margin-bottom:6px;">
+Upload New Image
+</p>
+
+<input type="file"
+name="profile_img"
+accept="image/png, image/jpeg, image/gif"
+onchange="previewImage(event)">
+
+</div>
+
+<div style="flex:1;">
+
+<label style="font-weight:bold;">Username</label>
+
+<input type="text"
+value="<?php echo htmlspecialchars($current_data['username']); ?>"
+readonly
+style="width:100%;padding:10px;margin-top:5px;margin-bottom:15px;
+border-radius:6px;border:1px solid #ccc;background:#f3f3f3;">
+
+<label style="font-weight:bold;">Email</label>
+
+<input type="email"
+name="email"
+value="<?php echo htmlspecialchars($current_data['email']); ?>"
+required
+style="width:100%;padding:10px;margin-top:5px;
+border-radius:6px;border:1px solid #ccc;">
+
+</div>
+
+</div>
+
+<div style="margin-top:25px;">
+
+<label style="font-weight:bold;">Biography</label>
+
+<textarea id="bio"
+name="biography"
+maxlength="1000"
+onkeyup="updateCounter()"
+style="width:100%;height:120px;padding:10px;margin-top:5px;
+border-radius:6px;border:1px solid #ccc;"><?php echo htmlspecialchars($current_data['biography'] ?? ''); ?></textarea>
+
+<p style="font-size:13px;color:#666;margin-top:5px;">
+Characters remaining:
+<span id="counter">1000</span>
+</p>
+
+</div>
+
+<button type="submit"
+style="margin-top:25px;width:100%;background:#3498db;color:white;
+padding:12px;border:none;border-radius:6px;font-size:16px;font-weight:bold;cursor:pointer;">
+Save Changes
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+function previewImage(event){
+const reader = new FileReader();
+reader.onload = function(){
+document.getElementById('preview').src = reader.result;
+};
+reader.readAsDataURL(event.target.files[0]);
+}
+
+function updateCounter(){
+let max = 1000;
+let current = document.getElementById("bio").value.length;
+document.getElementById("counter").innerText = max-current;
+}
+
+updateCounter();
+
+</script>
 
 <?php include '../includes/footer.php'; ?>
