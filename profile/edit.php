@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $file_name = $_FILES['profile_img']['name'];
         $file_size = $_FILES['profile_img']['size'];
 
-        $upload_dir = '../assets/uploads/';
+        $upload_dir = '/var/www/uploads/';
 
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0755, true);
