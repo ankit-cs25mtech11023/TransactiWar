@@ -18,16 +18,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "EMPTY_FIELDS";
 
     // Username: 3-20 chars, only letters, numbers, underscores, hyphens
-    } elseif (!preg_match('/^[a-zA-Z0-9_-]{3,20}$/', $username)) {
+    } elseif (!preg_match('/^(?=[a-zA-Z0-9])[a-zA-Z0-9_-]{2,19}[a-zA-Z0-9]$/', $username) || !preg_match('/[a-zA-Z0-9]/', $username)) {
         $error = "INVALID_USERNAME";
 
-    // Email: must be valid format
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "INVALID_EMAIL";
-
-    // Email: must be @iith.ac.in
-    } elseif (!str_ends_with(strtolower($email), '@iith.ac.in')) {
-        $error = "NOT_INSTITUTE";
+    // Email: local part must be letters, numbers, dots, underscores, hyphens only
+    // AND must end with @iith.ac.in
+    } elseif (!preg_match('/^[a-zA-Z0-9]+@iith\.ac\.in$/', strtolower($email))) {
+        // Determine which specific error to show
+        if (!str_ends_with(strtolower($email), '@iith.ac.in')) {
+            $error = "NOT_INSTITUTE";
+        } else {
+            $error = "INVALID_EMAIL";
+        }
 
     // Password: minimum 8 chars
     } elseif (strlen($password) < 8) {
@@ -524,8 +526,8 @@ include '../includes/header.php';
 <script>
   const errorMessages = {
     'EMPTY_FIELDS':       { icon: '📋', title: 'Missing Fields',      msg: 'All fields are required.<br>Please fill in your username, email and password.' },
-    'INVALID_USERNAME':   { icon: '🚫', title: 'Invalid Username',     msg: 'Username must be <strong>3–20 characters</strong> and can only contain:<br><br>✔ Letters (a–z, A–Z)<br>✔ Numbers (0–9)<br>✔ Underscore _<br>✔ Hyphen -<br><br>No spaces, @, $, ! or other symbols.' },
-    'INVALID_EMAIL':      { icon: '✉️', title: 'Invalid Email',        msg: 'Please enter a <strong>valid email address</strong>.<br><br>Example: <strong>yourname@iith.ac.in</strong>' },
+    'INVALID_USERNAME':   { icon: '🚫', title: 'Invalid Username',     msg: 'Username must be <strong>3–20 characters</strong> and:<br><br>✔ Start and end with a letter or number<br>✔ Contain at least one letter or number<br>✔ Only letters, numbers, _ or - in between<br><br>❌ ___ or --- alone are not valid<br><br>Example: <strong>warrior_42</strong> or <strong>john99</strong>' },
+    'INVALID_EMAIL':      { icon: '✉️', title: 'Invalid Email Format', msg: 'The part before <strong>@iith.ac.in</strong> can only contain:<br><br>✔ Letters (a–z)<br>✔ Numbers (0–9)<br><br>No dots, underscores, hyphens or symbols allowed.<br><br>Example: <strong>cs25mtech10001@iith.ac.in</strong>' },
     'NOT_INSTITUTE':      { icon: '🚫', title: 'Access Denied',        msg: 'Only warriors from <strong>IIT Hyderabad</strong> may enter the arena.<br><br>Your email must end with <strong>@iith.ac.in</strong> to register.' },
     'PASSWORD_SHORT':     { icon: '🔒', title: 'Password Too Short',   msg: 'Your password must be <strong>at least 8 characters</strong> long.<br><br>Choose a stronger password to protect your account.' },
     'PASSWORD_WEAK':      { icon: '🔒', title: 'Weak Password',        msg: 'Your password must contain:<br><br>✔ At least one <strong>letter</strong><br>✔ At least one <strong>number</strong><br><br>Example: <strong>warrior42</strong>' },
