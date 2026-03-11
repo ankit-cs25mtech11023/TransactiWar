@@ -21,9 +21,18 @@ $log_stmt->execute();
 $error = '';
 $profile_data = null;
 
-// 2. Fetch Target User Data based on the URL parameter ?user_id=WAR-XXXX
-if (isset($_GET['user_id']) && !empty(trim($_GET['user_id']))) {
-    $target_user_id = trim($_GET['user_id']);
+// 2. Fetch Target User Data based on the URL parameter
+$search_param = '';
+if (isset($_GET['user']) && !empty(trim($_GET['user']))) {
+    $search_param = trim($_GET['user']);
+    $query = "SELECT u.username, u.user_id, u.created_at, p.biography, p.profile_image_path 
+              FROM users u 
+              LEFT JOIN profiles p ON u.id = p.user_id 
+              WHERE u.user_id = ? OR u.username = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("ss", $search_param, $search_param);
+} elseif (isset($_GET['user_id']) && !empty(trim($_GET['user_id']))) {
+    $search_param = trim($_GET['user_id']);
     
     // Join users and profiles tables to get all the public info
     $query = "SELECT u.username, u.user_id, u.created_at, p.biography, p.profile_image_path 
@@ -32,7 +41,10 @@ if (isset($_GET['user_id']) && !empty(trim($_GET['user_id']))) {
               WHERE u.user_id = ?";
               
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("s", $target_user_id);
+    $stmt->bind_param("s", $search_param);
+}
+
+if ($search_param) {
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -42,7 +54,7 @@ if (isset($_GET['user_id']) && !empty(trim($_GET['user_id']))) {
         $error = "Target user not found on the battlefield.";
     }
 } else {
-    $error = "No user ID specified.";
+    $error = "No user specified.";
 }
 
 include '../includes/header.php'; 
