@@ -32,7 +32,10 @@ if (isset($_GET['user_id']) && !empty(trim($_GET['user_id']))) {
               WHERE u.user_id = ?";
 
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("s", $target_user_id);
+    $stmt->bind_param("s", $search_param);
+}
+
+if ($search_param) {
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -43,7 +46,7 @@ if (isset($_GET['user_id']) && !empty(trim($_GET['user_id']))) {
     }
 
 } else {
-    $error = "No user ID specified.";
+    $error = "No user specified.";
 }
 
 include '../includes/header.php'; 
