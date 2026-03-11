@@ -2,67 +2,206 @@
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
 // SECURITY CHECK: If the user is NOT logged in, kick them out instantly
-if (!isset($_SESSION['user_id'])) {
-    // We will uncomment this once the database and login logic are connected
-    // header("Location: /auth/login.php");
-    // exit();
+if (!isset($_SESSION['db_id'])) {
+    header("Location: ../auth/login.php");
+    exit();
 }
 
-include '../includes/header.php'; 
+require_once '../config/db_connect.php';
 
-// Temporary mock data to visualize the dashboard
-$mock_balance = 100; // Starting balance [cite: 23]
-$mock_username = "Ankit";
+$user_db_id = $_SESSION['db_id'];
+$username = $_SESSION['username'];
+
+// 1. Mandatory Logging: Record the visit to the dashboard 
+$ip_address = $_SERVER['REMOTE_ADDR'];
+$webpage = "/dashboard/index_copy.php";
+$log_stmt = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
+$log_stmt->bind_param("sss", $webpage, $username, $ip_address);
+$log_stmt->execute();
+
+// 2. Fetch the user's real, current balance from the database
+$stmt = $conn->prepare("SELECT balance, user_id FROM users WHERE id = ?");
+$stmt->bind_param("i", $user_db_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$user_data = $result->fetch_assoc();
+// Format the balance to always show 2 decimal places
+$current_balance = number_format($user_data['balance'], 2);
+$user_identifier = $user_data['user_id'];
+
+
+// 3. Fetch the 5 most recent transactions for this user
+$tx_query = "
+    SELECT t.amount, t.created_at, t.sender_id, t.receiver_id,
+           s.username AS sender_name, 
+           r.username AS receiver_name
+    FROM transactions t
+    LEFT JOIN users s ON t.sender_id = s.id
+    LEFT JOIN users r ON t.receiver_id = r.id
+    WHERE t.sender_id = ? OR t.receiver_id = ?
+    ORDER BY t.created_at DESC
+    LIMIT 5
+";
+$tx_stmt = $conn->prepare($tx_query);
+$tx_stmt->bind_param("ii", $user_db_id, $user_db_id);
+$tx_stmt->execute();
+$transactions = $tx_stmt->get_result();
+
+// 4. Prepare Recent Contacts from transactions
+$recent_contacts = [];
+$transactions_copy = [];
+while($tx = $transactions->fetch_assoc()){
+    $transactions_copy[] = $tx;
+    $is_sender = ($tx['sender_id'] == $user_db_id);
+    $counterparty = $is_sender ? $tx['receiver_name'] : $tx['sender_name'];
+    if (!isset($recent_contacts[$counterparty]) && $counterparty) {
+        $recent_contacts[$counterparty] = [
+            'name' => $counterparty,
+            'photo' => 'https://ui-avatars.com/api/?name=' . urlencode($counterparty) . '&background=random'
+        ];
+    }
+}
+$transactions->data_seek(0);
+
+
+include '../includes/header.php'; 
 ?>
 
-<div class="row mt-4">
-    <div class="col-md-12">
-        <h2 class="fw-bold border-bottom pb-2">Command Center</h2>
-    </div>
-</div>
-
-<div class="row mt-3">
-    <div class="col-md-4">
-        <div class="card bg-success text-white shadow-sm border-0 h-100">
-            <div class="card-body text-center d-flex flex-column justify-content-center">
-                <h5 class="card-title text-uppercase fw-bold opacity-75">Current Balance</h5>
-                <h1 class="display-3 fw-bold">Rs. <?php echo htmlspecialchars($mock_balance); ?></h1>
-            </div>
-            <div class="card-footer bg-transparent border-0 text-center pb-3">
-                <a href="../transfer/index.php" class="btn btn-light fw-bold w-75">Send Money</a>
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-primary text-white shadow-lg border-0" style="background: linear-gradient(45deg, #212529, #495057);">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap">
+                    <div>
+                        <h5 class="text-uppercase opacity-75 mb-1">Welcome back,</h5>
+                        <h1 class="display-5 fw-bold mb-0"><?php echo htmlspecialchars($username); ?></h1>
+                        <p class="mt-2 mb-0 opacity-75"><small>User ID: <?php echo htmlspecialchars($user_identifier); ?></small></p>
+                    </div>
+                    <div class="text-end mt-3 mt-md-0">
+                        <h5 class="text-uppercase opacity-75 mb-1">War Chest Balance</h5>
+                        <h1 class="display-4 fw-bold mb-0">Rs. <?php echo htmlspecialchars($current_balance); ?></h1>
+                        <a href="../transfer/index.php" class="btn btn-light fw-bold mt-3 shadow-sm rounded-pill px-4 text-dark">
+                            Initiate Transfer
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="col-md-8">
-        <div class="card shadow-sm border-0 h-100">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0">Recent Activity</h5>
+<div class="row g-4">
+    <!-- Main Column: Activity -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom-0 pt-4 px-4 pb-0 d-flex justify-content-between align-items-center">
+                <h4 class="mb-0 fw-bold text-dark">Recent Operations</h4>
+                <a href="../transfer/history.php" class="btn btn-outline-dark btn-sm rounded-pill">View All</a>
             </div>
-            <div class="card-body p-0">
+            <div class="card-body px-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Date</th>
+                                <th class="ps-4">Date</th>
                                 <th>Type</th>
-                                <th>User</th>
-                                <th>Amount</th>
+                                <th>Entity</th>
+                                <th class="text-end pe-4">Amount</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td colspan="4" class="text-center text-muted py-4">No recent transactions. The battlefield is quiet.</td>
-                            </tr>
+                            <?php if (count($transactions_copy) == 0): ?>
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-5">
+                                        <div class="py-4">
+                                            <h5 class="fw-normal text-secondary">No recent transactions.</h5>
+                                            <p class="small text-muted mb-0">The battlefield is quiet.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($transactions_copy as $t): 
+                                    $is_sender = ($t['sender_id'] == $user_db_id);
+                                    $tx_type = $is_sender ? 'Sent' : 'Received';
+                                    $badge_class = $is_sender ? 'bg-danger' : 'bg-success';
+                                    $amount_class = $is_sender ? 'text-danger' : 'text-success';
+                                    $sign = $is_sender ? '-' : '+';
+                                    $counterparty = $is_sender ? $t['receiver_name'] : $t['sender_name'];
+                                    $date = date('M j, Y g:i A', strtotime($t['created_at']));
+                                ?>
+                                    <tr>
+                                        <td class="ps-4"><?php echo $date; ?></td>
+                                        <td>
+                                            <span class="badge <?php echo $badge_class; ?>"><?php echo $tx_type; ?></span>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($counterparty); ?></td>
+                                        <td class="text-end pe-4 fw-bold <?php echo $amount_class; ?>">
+                                            <?php echo $sign; ?> Rs. <?php echo htmlspecialchars(number_format($t['amount'], 2)); ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div class="card-footer text-end bg-light">
-                <a href="../transfer/history.php" class="btn btn-sm btn-outline-secondary">View Full History</a>
+        </div>
+    </div>
+
+    <!-- Sidebar Column: Search & Contacts -->
+    <div class="col-lg-4">
+        <!-- Search Section -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3">Find Operatives</h5>
+                <form action="../profile/view.php" method="GET">
+                    <div class="input-group">
+                        <input type="text" name="user" class="form-control bg-light border-0" placeholder="Username or ID..." required>
+                        <button type="submit" class="btn btn-dark">Search</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Quick Contacts -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom-0 pt-4 px-4 pb-2">
+                <h5 class="mb-0 fw-bold">Recent Allies</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="d-flex flex-column gap-3" style="max-height: 300px; overflow-y: auto;">
+                    <?php if (empty($recent_contacts)): ?>
+                        <p class="text-muted small">No recent contacts to show.</p>
+                    <?php else: ?>
+                        <?php foreach ($recent_contacts as $contact): ?>
+                            <div class="d-flex align-items-center justify-content-between p-2 rounded hover-bg-light transition">
+                                <div class="d-flex align-items-center">
+                                    <img src="<?php echo $contact['photo']; ?>" alt="<?php echo htmlspecialchars($contact['name']); ?>" class="rounded-circle me-3" width="45" height="45">
+                                    <div>
+                                        <h6 class="mb-0 fw-bold"><?php echo htmlspecialchars($contact['name']); ?></h6>
+                                        <small class="text-muted">Operative</small>
+                                    </div>
+                                </div>
+                                <a href="../profile/view.php?user=<?php echo urlencode($contact['name']); ?>" class="btn btn-sm btn-light rounded-circle" title="View Profile">
+                                    &rarr;
+                                </a>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .hover-bg-light:hover {
+        background-color: #f8f9fa;
+        cursor: pointer;
+    }
+    .transition {
+        transition: background-color 0.2s ease;
+    }
+</style>
 
 <?php include '../includes/footer.php'; ?>
