@@ -13,7 +13,7 @@ services:
   db:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: asj*8@9#3$$74fhj
       MYSQL_DATABASE: transactiwar_db
       # Using root for local dev is fine, but we can set a specific user later
     ports:

@@ -60,11 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt_profile->execute();
 
                 // 7. Log the registration activity
-                $ip_address = $_SERVER['REMOTE_ADDR'];
-                $webpage    = "/auth/register.php";
-                $log_stmt   = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
-                $log_stmt->bind_param("sss", $webpage, $username, $ip_address);
-                $log_stmt->execute();
+                require_once '../includes/logger.php';
+                log_activity($conn, $_SERVER['REQUEST_URI'], $username, $_SERVER['REMOTE_ADDR']);
 
                 $success = "Registration successful! You can now login.";
             }

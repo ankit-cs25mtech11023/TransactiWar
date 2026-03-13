@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute();
         $result = $stmt->get_result();
 
+        require_once '../includes/logger.php';
         // 2. Check if a user with that username actually exists
         if ($result->num_rows === 1) {
             $user = $result->fetch_assoc();
@@ -33,20 +34,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user_id']  = $user['user_id']; 
                 $_SESSION['username'] = $user['username'];
 
-                // 5. Mandatory Requirement: Log the successful login 
-                $ip_address = $_SERVER['REMOTE_ADDR'];
-                $webpage    = "/auth/login.php";
-                $log_stmt   = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
-                $log_stmt->bind_param("sss", $webpage, $user['username'], $ip_address);
-                $log_stmt->execute();
+                // 5. Mandatory Requirement: Log the successful login
+                log_activity($conn, $_SERVER['REQUEST_URI'], $user['username'], $_SERVER['REMOTE_ADDR']);
 
                 // 6. Send them to the Command Center
                 header("Location: ../dashboard/index.php");
                 exit();
             } else {
+                log_activity($conn, $_SERVER['REQUEST_URI'], $username . ' (failed login)', $_SERVER['REMOTE_ADDR']);
                 $error = "Invalid username or password.";
             }
         } else {
+            log_activity($conn, $_SERVER['REQUEST_URI'], $username . ' (failed login)', $_SERVER['REMOTE_ADDR']);
             $error = "Invalid username or password.";
         }
     }

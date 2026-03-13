@@ -12,12 +12,9 @@ require_once '../config/db_connect.php';
 $user_db_id = $_SESSION['db_id'];
 $username = $_SESSION['username'];
 
-// 1. Mandatory Logging: Record the visit to the dashboard 
-$ip_address = $_SERVER['REMOTE_ADDR'];
-$webpage = "/dashboard/index.php";
-$log_stmt = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
-$log_stmt->bind_param("sss", $webpage, $username, $ip_address);
-$log_stmt->execute();
+// 1. Mandatory Logging: Record the visit to the dashboard
+require_once '../includes/logger.php';
+log_activity($conn, $_SERVER['REQUEST_URI'], $username, $_SERVER['REMOTE_ADDR']);
 
 // 2. Fetch the user's real, current balance from the database
 $stmt = $conn->prepare("SELECT balance, user_id FROM users WHERE id = ?");
@@ -255,7 +252,7 @@ include '../includes/header.php';
                 <!-- Search Section -->
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-header bg-white border-bottom-0 pt-4 px-4 pb-2">
-                        <h5 class="mb-0 text-dark fw-bold font-family-sans-serif">Find Operatives</h5>
+                        <h5 class="mb-0 text-dark fw-bold font-family-sans-serif">Find Operatives (Users)</h5>
                     </div>
                     <div class="card-body p-4">
                         <form action="../profile/search.php" method="GET">
@@ -270,7 +267,7 @@ include '../includes/header.php';
                 <!-- Quick Contacts -->
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-white border-bottom-0 pt-4 px-4 pb-2">
-                        <h5 class="mb-0 text-dark fw-bold font-family-sans-serif">Recent Contacts</h5>
+                        <h5 class="mb-0 text-dark fw-bold font-family-sans-serif">Recent Users</h5>
                     </div>
                     <div class="card-body p-4">
                         <div class="d-flex flex-column gap-3" style="max-height: 300px; overflow-y: auto;">

@@ -14,11 +14,8 @@ $username = $_SESSION['username'];
 $user_public_id = $_SESSION['user_id'];
 
 // 1. Mandatory Logging
-$ip_address = $_SERVER['REMOTE_ADDR'];
-$webpage = "/transfer/index.php";
-$log_stmt = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
-$log_stmt->bind_param("sss", $webpage, $username, $ip_address);
-$log_stmt->execute();
+require_once '../includes/logger.php';
+log_activity($conn, $_SERVER['REQUEST_URI'], $username, $_SERVER['REMOTE_ADDR']);
 
 $error = '';
 $success = '';
@@ -104,6 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
                 $tx_stmt = $conn->prepare("INSERT INTO transactions (sender_id, receiver_id, amount, comment) VALUES (?, ?, ?, ?)");
                 $tx_stmt->bind_param("iids", $user_db_id, $receiver_db_id, $amount, $comment);
                 $tx_stmt->execute();
+
+                log_activity($conn, '/transfer/success', $username, $_SERVER['REMOTE_ADDR']);
 
                 $conn->commit();
 

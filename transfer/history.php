@@ -13,11 +13,8 @@ $user_db_id = $_SESSION['db_id'];
 $username   = $_SESSION['username'];
 
 // 1. Mandatory Logging
-$ip_address = $_SERVER['REMOTE_ADDR'];
-$webpage    = "/transfer/history.php";
-$log_stmt   = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
-$log_stmt->bind_param("sss", $webpage, $username, $ip_address);
-$log_stmt->execute();
+require_once '../includes/logger.php';
+log_activity($conn, $_SERVER['REQUEST_URI'], $username, $_SERVER['REMOTE_ADDR']);
 
 // 2. Filters
 $filter = $_GET['filter'] ?? 'all';   // all | sent | received

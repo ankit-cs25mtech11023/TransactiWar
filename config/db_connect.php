@@ -4,7 +4,7 @@ date_default_timezone_set('Asia/Kolkata');
 $host = 'db'; // This MUST be 'db' because that is the service name in Docker
 $dbname = 'transactiwar_db';
 $user = 'root'; 
-$pass = 'rootpassword';
+$pass = 'asj*8@9#3$74fhj';
 
 // Enable mysqli error reporting for easier debugging during development
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);

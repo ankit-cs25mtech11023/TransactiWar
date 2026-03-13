@@ -17,11 +17,21 @@ $error = '';
 $success = '';
 
 // 1. Mandatory Logging
-$ip_address = $_SERVER['REMOTE_ADDR'];
-$webpage = "/profile/edit.php";
-$log_stmt = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
-$log_stmt->bind_param("sss", $webpage, $username, $ip_address);
-$log_stmt->execute();
+require_once '../includes/logger.php';
+log_activity($conn, $_SERVER['REQUEST_URI'], $username, $_SERVER['REMOTE_ADDR']);
+
+// Function to validate email
+function validate_email($new_email, &$error) {
+    if (!preg_match('/^[a-zA-Z0-9]+@iith\.ac\.in$/', strtolower($new_email))) {
+        if (!str_ends_with(strtolower($new_email), '@iith.ac.in')) {
+            $error = "Only emails from iith.ac.in are allowed.";
+        } else {
+            $error = "The local part of the email is invalid. Only letters and numbers are allowed";
+        }
+        return false;
+    }
+    return true;
+}
 
 // 2. Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -29,15 +39,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $new_email = trim($_POST['email']);
     $new_bio = trim($_POST['biography']);
 
-    // Update Email
-    $update_user = $conn->prepare("UPDATE users SET email = ? WHERE id = ?");
-    $update_user->bind_param("si", $new_email, $user_db_id);
-    $update_user->execute();
+    // Validate Email
+    if (validate_email($new_email, $error)) {
+        // Update Email
+        $update_user = $conn->prepare("UPDATE users SET email = ? WHERE id = ?");
+        $update_user->bind_param("si", $new_email, $user_db_id);
+        $update_user->execute();
 
-    // Update Biography
-    $update_bio = $conn->prepare("UPDATE profiles SET biography = ? WHERE user_id = ?");
-    $update_bio->bind_param("si", $new_bio, $user_db_id);
-    $update_bio->execute();
+        // Update Biography - This is secure against SQL injection as it uses prepared statements
+        $update_bio = $conn->prepare("UPDATE profiles SET biography = ? WHERE user_id = ?");
+        $update_bio->bind_param("si", $new_bio, $user_db_id);
+        $update_bio->execute();
+    }
 
     // SECURE IMAGE UPLOAD
     if (isset($_FILES['profile_img']) && $_FILES['profile_img']['error'] === UPLOAD_ERR_OK) {

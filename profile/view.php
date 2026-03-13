@@ -12,11 +12,8 @@ require_once '../config/db_connect.php';
 $viewer_username = $_SESSION['username'];
 
 // 1. Mandatory Logging
-$ip_address = $_SERVER['REMOTE_ADDR'];
-$webpage = "/profile/view.php";
-$log_stmt = $conn->prepare("INSERT INTO activity_logs (webpage, username, ip_address) VALUES (?, ?, ?)");
-$log_stmt->bind_param("sss", $webpage, $viewer_username, $ip_address);
-$log_stmt->execute();
+require_once '../includes/logger.php';
+log_activity($conn, $_SERVER['REQUEST_URI'], $viewer_username, $_SERVER['REMOTE_ADDR']);
 
 $error = '';
 $profile_data = null;
