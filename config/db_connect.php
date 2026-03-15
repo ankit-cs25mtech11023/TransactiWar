@@ -20,6 +20,6 @@ try {
 } catch (mysqli_sql_exception $e) {
     // If the connection fails, stop the script and show a generic error
     // In a real production environment, you would log this error instead of showing it
-    die("Database connection failed. Please try again later.");
+    die("Database connection failed: " . $e->getMessage());
 }
 ?>
