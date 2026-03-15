@@ -63,7 +63,7 @@ cd TransactiWar
 docker compose up --build -d
 
 # 3. Open in browser
-open http://localhost:8000
+open https://localhost:443
 ```
 
 The `init.sql` script automatically:
@@ -83,6 +83,8 @@ docker compose down -v       # stop and delete volumes
 ## Test Accounts (Auto-Created)
 
 Run the following command after the containers are up and running to populate the database with 100 test users.
+
+*Note: Use the actual web container name instead of `transactiwar-web-1`.*
 
 ```bash
 docker exec transactiwar-web-1 php /var/www/html/scripts/auto_create.php
@@ -106,6 +108,8 @@ All user actions are recorded in the `activity_logs` table in the database. You 
 1. **Connect to the MySQL container:**
    
    Use the following command to open a MySQL shell inside the running `db` container:
+   
+   *Note: Use the actual web container name instead of `transactiwar-web-1`.*
    
    ```bash
    docker exec -it transactiwar-db-1 mysql -u root -p
