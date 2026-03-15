@@ -3,7 +3,6 @@ services:
     build: .
     ports:
       - "443:443"
-      - "80:80"
     volumes:
       # This syncs your local folder to the container in real-time
       - .:/var/www/html
