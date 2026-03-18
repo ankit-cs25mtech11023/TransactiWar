@@ -1,10 +1,12 @@
 <?php
 // Database configuration matching your compose.yaml file
 date_default_timezone_set('Asia/Kolkata');
-$host = 'db'; // This MUST be 'db' because that is the service name in Docker
-$dbname = 'transactiwar_db';
-$user = 'root'; 
-$pass = 'asj*8@9#3$74fhj';
+
+// SECURE SECRET RETRIEVAL
+$host = getenv('DB_HOST'); 
+$dbname = getenv('DB_NAME');
+$user = getenv('DB_USER'); 
+$pass = getenv('DB_PASS');
 
 // Enable mysqli error reporting for easier debugging during development
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
@@ -18,8 +20,6 @@ try {
     $conn->query("SET time_zone = '+05:30'");
     
 } catch (mysqli_sql_exception $e) {
-    // If the connection fails, stop the script and show a generic error
-    // In a real production environment, you would log this error instead of showing it
     die("Database connection failed: " . $e->getMessage());
 }
 ?>

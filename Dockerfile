@@ -17,6 +17,14 @@ RUN a2enmod ssl && \
 # Set the working directory
 WORKDIR /var/www/html
 
+# This copies everything into the image (except what is blocked by .dockerignore)
+# and gives the Apache user ownership so your app runs flawlessly.
+COPY --chown=www-data:www-data . /var/www/html/
+
+# SCRUB SENSITIVE INFRASTRUCTURE FROM PUBLIC WEB ROOT
+RUN rm -rf /var/www/html/config/apache \
+    && rm -rf /var/www/html/config/nginx
+
 RUN mkdir -p /var/www/uploads \
     && chown -R www-data:www-data /var/www/uploads \
     && chmod -R 755 /var/www/uploads

@@ -1,0 +1,32 @@
+# 1. Environment Secrets (CRITICAL)
+.env
+
+# 2. Cryptographic Keys & Certificates (CRITICAL)
+# Never commit SSL private keys. Attackers can use these to decrypt your traffic.
+config/nginx/ssl/*.key
+config/nginx/ssl/*.crt
+config/apache/certs/*.key
+config/apache/certs/*.crt
+*.pem
+
+# 3. Local User Uploads
+# Ignore any user profile pictures or files uploaded during local testing
+uploads/
+assets/uploads/
+
+# 4. OS Artifacts
+# Hidden system files created by Mac/Windows that shouldn't clutter the repo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 5. IDE Configuration Files
+# Hides your personal VS Code or JetBrains editor settings from the team
+.vscode/
+.idea/
+*.swp
+*.swo

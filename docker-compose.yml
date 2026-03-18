@@ -4,17 +4,20 @@ services:
     ports:
       - "443:443"
     volumes:
-      # This syncs your local folder to the container in real-time
-      - .:/var/www/html
       - secure_uploads:/var/www/uploads
     depends_on:
       - db
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
 
   db:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: asj*8@9#3$$74fhj
-      MYSQL_DATABASE: transactiwar_db
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
       # Using root for local dev is fine, but we can set a specific user later
     ports:
       - "3306:3306"
