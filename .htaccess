@@ -32,3 +32,9 @@ RewriteRule ^(?:database|config|scripts)(?:/|$) - [F,L]
 <FilesMatch "(?i)\.(?:md|csv)$">
     Require all denied
 </FilesMatch>
+
+# 6) Restrict HTTP methods - only allow GET, HEAD, POST, OPTIONS
+#    Deny DELETE, PUT, PATCH, CONNECT, TRACE, LINK, UNLINK, etc.
+<LimitExcept GET HEAD POST OPTIONS>
+    Require all denied
+</LimitExcept>
