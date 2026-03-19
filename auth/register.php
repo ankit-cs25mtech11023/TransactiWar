@@ -1,6 +1,9 @@
 <?php 
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 // 1. Include the database connection
 require_once '../config/db_connect.php';
 
@@ -9,6 +12,9 @@ $success = '';
 
 // 2. Check if the form was submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        die("Security Violation: Invalid CSRF Token.");
+    }
     $username = trim($_POST['username']);
     $email    = trim($_POST['email']);
     $password = $_POST['password'];
@@ -455,7 +461,7 @@ include '../includes/header.php';
 
 
         <form action="register.php" method="POST" id="registerForm">
-
+          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
           <label class="field-label" for="username">Username</label>
           <input type="text" class="field-input" id="username" name="username" placeholder="Choose a unique name" required value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>">
           <span class="field-hint">3–20 chars. Letters, numbers, _ and - only. No spaces or symbols.</span>

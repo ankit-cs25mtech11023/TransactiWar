@@ -1,5 +1,10 @@
 <?php 
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 require_once '../config/db_connect.php';
 
 // If the user is already logged in, redirect them immediately to the dashboard
@@ -9,44 +14,171 @@ if (isset($_SESSION['user_id'])) {
 }
 
 $error = '';
+
+// Function to check if login_attempts table exists
+function table_exists($conn, $table_name) {
+    $result = $conn->query("SHOW TABLES LIKE '$table_name'");
+    return $result && $result->num_rows > 0;
+}
+
+// Function to check if account is locked due to brute force
+function is_account_locked($conn, $username, $ip_address) {
+    if (!table_exists($conn, 'login_attempts')) {
+        return false;
+    }
+    
+    // Count failed attempts in the last 10 minutes (600 seconds)
+    $stmt = $conn->prepare("SELECT COUNT(*) as attempt_count FROM login_attempts WHERE username = ? AND ip_address = ? AND attempt_time > DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("ss", $username, $ip_address);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    
+    return $result['attempt_count'] >= 5;
+}
+
+// Function to get remaining lockout time in seconds
+function get_lockout_time_remaining($conn, $username, $ip_address) {
+    if (!table_exists($conn, 'login_attempts')) {
+        return 0;
+    }
+    
+    $stmt = $conn->prepare("SELECT MAX(attempt_time) as last_attempt FROM login_attempts WHERE username = ? AND ip_address = ? AND attempt_time > DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param("ss", $username, $ip_address);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    
+    if ($result['last_attempt']) {
+        $last_attempt = strtotime($result['last_attempt']);
+        $lockout_end = $last_attempt + 600; // 10 minutes = 600 seconds
+        $remaining = $lockout_end - time();
+        return max(0, $remaining);
+    }
+    return 0;
+}
+
+// Function to record a failed login attempt
+function record_failed_attempt($conn, $username, $ip_address) {
+    if (!table_exists($conn, 'login_attempts')) {
+        return;
+    }
+    
+    $stmt = $conn->prepare("INSERT INTO login_attempts (username, ip_address) VALUES (?, ?)");
+    if ($stmt) {
+        $stmt->bind_param("ss", $username, $ip_address);
+        $stmt->execute();
+    }
+}
+
+// Function to clear failed attempts on successful login
+function clear_failed_attempts($conn, $username, $ip_address) {
+    if (!table_exists($conn, 'login_attempts')) {
+        return;
+    }
+    
+    $stmt = $conn->prepare("DELETE FROM login_attempts WHERE username = ? AND ip_address = ?");
+    if ($stmt) {
+        $stmt->bind_param("ss", $username, $ip_address);
+        $stmt->execute();
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        die("Security Violation: Invalid CSRF Token.");
+    }
     $username = trim($_POST['username']);
     $password = $_POST['password'];
+    $ip_address = $_SERVER['REMOTE_ADDR'];
 
     if (empty($username) || empty($password)) {
         $error = "Please enter both username and password.";
     } else {
-        // 1. Fetch the user's data using a Prepared Statement to prevent SQL Injection
-        $stmt = $conn->prepare("SELECT id, user_id, username, password_hash FROM users WHERE username = ?");
-        $stmt->bind_param("s", $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        require_once '../includes/logger.php';
-        // 2. Check if a user with that username actually exists
-        if ($result->num_rows === 1) {
-            $user = $result->fetch_assoc();
-
-            // 3. Verify the password against the stored hash
-            if (password_verify($password, $user['password_hash'])) {
-                // 4. Password is correct! Set up the session variables
-                $_SESSION['db_id']    = $user['id']; 
-                $_SESSION['user_id']  = $user['user_id']; 
-                $_SESSION['username'] = $user['username'];
-
-                // 5. Mandatory Requirement: Log the successful login
-                log_activity($conn, $_SERVER['REQUEST_URI'], $user['username'], $_SERVER['REMOTE_ADDR']);
-
-                // 6. Send them to the Command Center
-                header("Location: ../dashboard/index.php");
-                exit();
-            } else {
-                log_activity($conn, $_SERVER['REQUEST_URI'], $username . ' (failed login)', $_SERVER['REMOTE_ADDR']);
-                $error = "Invalid username or password.";
-            }
+        // Check if account is locked due to brute force
+        if (is_account_locked($conn, $username, $ip_address)) {
+            $remaining_time = get_lockout_time_remaining($conn, $username, $ip_address);
+            $minutes = ceil($remaining_time / 60);
+            $error = "Too many failed login attempts. Please try again in " . $minutes . " minute(s).";
         } else {
-            log_activity($conn, $_SERVER['REQUEST_URI'], $username . ' (failed login)', $_SERVER['REMOTE_ADDR']);
-            $error = "Invalid username or password.";
+            // 1. Fetch the user's data using a Prepared Statement to prevent SQL Injection
+            $stmt = $conn->prepare("SELECT id, user_id, username, password_hash FROM users WHERE username = ?");
+            $stmt->bind_param("s", $username);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            require_once '../includes/logger.php';
+            // 2. Check if a user with that username actually exists
+            if ($result->num_rows === 1) {
+                $user = $result->fetch_assoc();
+
+                // 3. Verify the password against the stored hash
+                if (password_verify($password, $user['password_hash'])) {
+                    // 4. Password is correct! Clear any failed attempts
+                    clear_failed_attempts($conn, $username, $ip_address);
+                    
+                    // 5. Set up the session variables
+                    session_regenerate_id(true);
+                    $_SESSION['db_id']    = $user['id']; 
+                    $_SESSION['user_id']  = $user['user_id']; 
+                    $_SESSION['username'] = $user['username'];
+
+                    // 6. Mandatory Requirement: Log the successful login
+                    log_activity($conn, $_SERVER['REQUEST_URI'], $user['username'], $_SERVER['REMOTE_ADDR']);
+
+                    // 7. Send them to the Command Center
+                    header("Location: ../dashboard/index.php");
+                    exit();
+                } else {
+                    // Record failed attempt
+                    record_failed_attempt($conn, $username, $ip_address);
+                    log_activity($conn, $_SERVER['REQUEST_URI'], $username . ' (failed login)', $_SERVER['REMOTE_ADDR']);
+                    
+                    // Check if this was the 5th attempt
+                    $attempt_count = 0;
+                    if (table_exists($conn, 'login_attempts')) {
+                        $check_stmt = $conn->prepare("SELECT COUNT(*) as count FROM login_attempts WHERE username = ? AND ip_address = ? AND attempt_time > DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+                        if ($check_stmt) {
+                            $check_stmt->bind_param("ss", $username, $ip_address);
+                            $check_stmt->execute();
+                            $attempt_count = $check_stmt->get_result()->fetch_assoc()['count'];
+                        }
+                    }
+                    
+                    if ($attempt_count >= 5) {
+                        $error = "Too many failed login attempts. Your account is locked for 10 minutes.";
+                    } else {
+                        $remaining_attempts = 5 - $attempt_count;
+                        $error = "Invalid username or password. (" . $remaining_attempts . " attempt(s) remaining)";
+                    }
+                }
+            } else {
+                // Record failed attempt even if username doesn't exist (prevent username enumeration)
+                record_failed_attempt($conn, $username, $ip_address);
+                log_activity($conn, $_SERVER['REQUEST_URI'], $username . ' (failed login)', $_SERVER['REMOTE_ADDR']);
+                
+                // Check if this was the 5th attempt
+                $attempt_count = 0;
+                if (table_exists($conn, 'login_attempts')) {
+                    $check_stmt = $conn->prepare("SELECT COUNT(*) as count FROM login_attempts WHERE username = ? AND ip_address = ? AND attempt_time > DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+                    if ($check_stmt) {
+                        $check_stmt->bind_param("ss", $username, $ip_address);
+                        $check_stmt->execute();
+                        $attempt_count = $check_stmt->get_result()->fetch_assoc()['count'];
+                    }
+                }
+                
+                if ($attempt_count >= 5) {
+                    $error = "Too many failed login attempts. Your account is locked for 10 minutes.";
+                } else {
+                    $remaining_attempts = 5 - $attempt_count;
+                    $error = "Invalid username or password. (" . $remaining_attempts . " attempt(s) remaining)";
+                }
+            }
         }
     }
 }
@@ -315,6 +447,7 @@ include '../includes/header.php';
         <?php endif; ?>
 
         <form action="login.php" method="POST">
+          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
           <label class="field-label" for="username">Username</label>
           <input type="text" class="field-input" id="username" name="username" placeholder="Enter your username" required value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>">
 

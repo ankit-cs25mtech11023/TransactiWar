@@ -12,6 +12,11 @@ $user_db_id = $_SESSION['db_id'];
 $username = $_SESSION['username'];
 $user_public_id = $_SESSION['user_id'];
 
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 $error = '';
 $success = '';
 
@@ -32,22 +37,23 @@ function validate_email($new_email, &$error) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        error_log("CSRF Attack Blocked on profile edit for user ID: " . $_SESSION['db_id']);
+        die("Security Violation: Invalid CSRF Token. Profile update aborted.");
+    }
+
     $new_email = trim($_POST['email']);
     $new_bio = trim($_POST['biography']);
 
-    if (validate_email($new_email, $error)) {
+    // Fetch current user's own email
+    $check_self = $conn->prepare("SELECT email FROM users WHERE id = ?");
+    $check_self->bind_param("i", $user_db_id);
+    $check_self->execute();
+    $existing_email = $check_self->get_result()->fetch_assoc()['email'];
 
-        // Fetch current user's own email
-        $check_self = $conn->prepare("SELECT email FROM users WHERE id = ?");
-        $check_self->bind_param("i", $user_db_id);
-        $check_self->execute();
-        $existing_email = $check_self->get_result()->fetch_assoc()['email'];
-
-        if (strtolower($new_email) === strtolower($existing_email)) {
-            // Same as their own current email — no point updating
-            $error = "New email must be different from your current email.";
-
-        } else {
+    // Only validate and update email if it has been changed
+    if (strtolower($new_email) !== strtolower($existing_email)) {
+        if (validate_email($new_email, $error)) {
             // Check if another user already owns this email
             $check_dup = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
             $check_dup->bind_param("si", $new_email, $user_db_id);
@@ -63,12 +69,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $update_user->execute();
             }
         }
-
-        // Biography update is independent of email outcome
-        $update_bio = $conn->prepare("UPDATE profiles SET biography = ? WHERE user_id = ?");
-        $update_bio->bind_param("si", $new_bio, $user_db_id);
-        $update_bio->execute();
     }
+
+    // Biography update is independent of email outcome
+    $update_bio = $conn->prepare("UPDATE profiles SET biography = ? WHERE user_id = ?");
+    $update_bio->bind_param("si", $new_bio, $user_db_id);
+    $update_bio->execute();
 
     if (isset($_FILES['profile_img']) && $_FILES['profile_img']['error'] === UPLOAD_ERR_OK) {
 
@@ -181,6 +187,9 @@ include '../includes/header.php';
                         <?php endif; ?>
 
                         <form action="edit.php" method="POST" enctype="multipart/form-data">
+                            
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+
                             <div class="row">
                                 <div class="col-md-4 text-center">
                                     <img id="preview" src="avatar.php" class="img-fluid rounded-circle mb-3" style="width:150px;height:150px;object-fit:cover;border:4px solid #ddd;">

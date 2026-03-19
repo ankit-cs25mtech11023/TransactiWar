@@ -38,3 +38,13 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     ip_address VARCHAR(45) NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 5. Create Login Attempts Table (Brute Force Protection)
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_username_ip (username, ip_address),
+    INDEX idx_attempt_time (attempt_time)
+);

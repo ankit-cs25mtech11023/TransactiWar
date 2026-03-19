@@ -13,6 +13,11 @@ $user_db_id = $_SESSION['db_id'];
 $username = $_SESSION['username'];
 $user_public_id = $_SESSION['user_id'];
 
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // 1. Mandatory Logging
 require_once '../includes/logger.php';
 log_activity($conn, $_SERVER['REQUEST_URI'], $username, $_SERVER['REMOTE_ADDR']);
@@ -20,21 +25,18 @@ log_activity($conn, $_SERVER['REQUEST_URI'], $username, $_SERVER['REMOTE_ADDR'])
 $error = '';
 $success = '';
 
-// Check for messages from redirect
-if (isset($_GET['status'])) {
-    if ($_GET['status'] === 'success') {
-        $success = "Transaction was successful!";
-    } elseif ($_GET['status'] === 'insufficient_funds') {
-        $error = "Insufficient funds. You cannot transfer more than your current balance.";
-    } elseif ($_GET['status'] === 'self_transfer') {
-        $error = "You cannot send money to yourself.";
-    } elseif ($_GET['status'] === 'invalid_receiver') {
-        $error = "Receiver User ID not found.";
-    } elseif ($_GET['status'] === 'invalid_amount') {
-        $error = "Transfer amount must be greater than zero.";
-    } else {
-        $error = "An unknown error occurred during the transaction.";
-    }
+// ==========================================
+// SECURITY PATCH: Server-Side Flash Messages
+// ==========================================
+// We completely ignore the URL. We only read from the server's secure session memory.
+if (isset($_SESSION['flash_success'])) {
+    $success = $_SESSION['flash_success'];
+    unset($_SESSION['flash_success']); // Destroy immediately after reading
+}
+
+if (isset($_SESSION['flash_error'])) {
+    $error = $_SESSION['flash_error'];
+    unset($_SESSION['flash_error']); // Destroy immediately after reading
 }
 
 $search_results = [];
@@ -49,7 +51,10 @@ $current_balance = $bal_result->fetch_assoc()['balance'];
 // 3. Handle User Search (GET Request)
 if (isset($_GET['search_query']) && !empty(trim($_GET['search_query']))) {
     $search_term = trim($_GET['search_query']);
-    $search_like = "%" . $search_term . "%";
+    
+    // SECURITY PATCH applied earlier: Escape wildcards just in case
+    $escaped_term = addcslashes($search_term, '%_\\');
+    $search_like = "%" . $escaped_term . "%";
 
     $search_stmt = $conn->prepare("SELECT user_id, username FROM users WHERE (username LIKE ? OR user_id = ?) AND id != ? LIMIT 10");
     $search_stmt->bind_param("ssi", $search_like, $search_term, $user_db_id);
@@ -62,18 +67,35 @@ if (isset($_GET['search_query']) && !empty(trim($_GET['search_query']))) {
 
 // 4. Handle Money Transfer (POST Request)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST['amount'])) {
+    
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        error_log("CSRF Attack Blocked for user ID: " . $_SESSION['db_id']);
+        die("Security Violation: Invalid CSRF Token. Transfer aborted.");
+    }
+
+    unset($_SESSION['csrf_token']);
+
     $receiver_public_id = trim($_POST['receiver_id']);
     $amount = floatval($_POST['amount']);
+
+    $amount = round($amount, 2);
+    
     $comment = trim($_POST['comment'] ?? '');
 
-    if ($amount <= 0) {
-        header("Location: index.php?status=invalid_amount");
+    // ==========================================
+    // SECURITY PATCH: Enforce Flash Variables on all Errors
+    // ==========================================
+    if ($amount < 0.01) {
+        $_SESSION['flash_error'] = "Transfer amount must be greater than zero.";
+        header("Location: index.php");
         exit();
     } elseif ($receiver_public_id === $user_public_id) {
-        header("Location: index.php?status=self_transfer");
+        $_SESSION['flash_error'] = "You cannot send money to yourself.";
+        header("Location: index.php");
         exit();
     } elseif ($amount > $current_balance) {
-        header("Location: index.php?status=insufficient_funds");
+        $_SESSION['flash_error'] = "Insufficient funds. You cannot transfer more than your current balance.";
+        header("Location: index.php");
         exit();
     } else {
         $rec_stmt = $conn->prepare("SELECT id FROM users WHERE user_id = ?");
@@ -82,7 +104,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
         $rec_result = $rec_stmt->get_result();
 
         if ($rec_result->num_rows === 0) {
-            header("Location: index.php?status=invalid_receiver");
+            $_SESSION['flash_error'] = "Receiver User ID not found.";
+            header("Location: index.php");
             exit();
         } else {
             $receiver_db_id = $rec_result->fetch_assoc()['id'];
@@ -106,12 +129,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receiver_id'], $_POST
 
                 $conn->commit();
 
-                header("Location: index.php?status=success");
+                // Success flash variable is properly set here
+                $_SESSION['flash_success'] = "Transaction was successful!";
+                header("Location: index.php");
                 exit();
 
             } catch (mysqli_sql_exception $exception) {
                 $conn->rollback();
-                header("Location: index.php?status=error");
+                $_SESSION['flash_error'] = "An unknown error occurred during the transaction.";
+                header("Location: index.php");
                 exit();
             }
         }
@@ -131,11 +157,11 @@ include '../includes/header.php';
         position: fixed;
         inset: 0;
         overflow-y: auto;
-        padding-top: 56px; /* Push content down to avoid navbar overlap */
+        padding-top: 56px; 
     }
     .navbar {
         position: relative;
-        z-index: 1030; /* Ensure navbar is on top */
+        z-index: 1030; 
     }
     .bg-scene {
         position: absolute;
@@ -198,16 +224,6 @@ include '../includes/header.php';
     }
 </style>
 <div class="battle-page">
-<!-- <svg class="bg-scene" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-    <ellipse cx="720" cy="580" rx="900" ry="260" fill="#7a3e00" opacity="0.4"/>
-    <polygon points="0,430 170,210 340,430" fill="#5a3010"/>
-    <polygon points="220,430 430,165 640,430" fill="#4a2808"/>
-    <polygon points="490,430 700,185 910,430" fill="#5a3010"/>
-    <polygon points="800,430 1020,155 1240,430" fill="#4a2808"/>
-    <polygon points="1100,430 1300,210 1440,380 1440,430" fill="#5a3010"/>
-    <rect x="0" y="430" width="1440" height="170" fill="#2e1800"/>
-    </g>
-  </svg> -->
     <?php include '../includes/bg_scene.php'; ?>
     <div class="container content-wrapper">
         <div class="row mt-4">
@@ -284,6 +300,8 @@ include '../includes/header.php';
                     </div>
                     <div class="card-body p-4">
                         <form action="index.php" method="POST">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+
                             <div class="mb-3">
                                 <label for="receiver_id" class="form-label fw-bold text-muted">Receiver User ID</label>
                                 <input type="text" class="form-control" id="receiver_id" name="receiver_id"

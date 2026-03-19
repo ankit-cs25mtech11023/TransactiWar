@@ -13,18 +13,24 @@ require_once '../includes/logger.php';
 if (isset($_SESSION['username'])) {
     log_activity($conn, $_SERVER['REQUEST_URI'], $_SESSION['username'], $_SERVER['REMOTE_ADDR']);
 }
-// --- END LOGGING ---
 
-// 2. Unset all of the session variables
-session_unset();
+// 2. Unset all of the session variables in memory
+$_SESSION = array();
 
-// 3. Completely destroy the session on the server
+// 3. Poison and destroy the session cookie in the user's browser
+if (ini_get("session.use_cookies")) {
+    $params = session_get_cookie_params();
+    // Set the cookie expiration date to the past to force the browser to delete it
+    setcookie(session_name(), '', time() - 42000,
+        $params["path"], $params["domain"],
+        $params["secure"], $params["httponly"]
+    );
+}
+
+// 4. Completely destroy the session file on the server
 session_destroy();
 
-// 4. Redirect the user back to the login page
-// Note: Using a relative path is okay, but an absolute path is slightly more robust.
+// 5. Redirect the user back to the login perimeter
 header("Location: login.php");
-
-// 5. Always call exit() after a header redirect
 exit();
 ?>

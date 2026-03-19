@@ -1,0 +1,7 @@
+# Disable directory listing
+Options -Indexes
+
+# Deny access to sensitive files
+<FilesMatch "(\.env|\.git.*|Dockerfile|docker-compose\.yml)">
+    Require all denied
+</FilesMatch>

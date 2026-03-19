@@ -23,9 +23,13 @@ $search_results = [];
 $search_term = '';
 
 // 2. Database Lookup for Partial Matches (Excluding the logged-in user)
+// 2. Database Lookup for Partial Matches (Excluding the logged-in user)
 if (isset($_GET['query']) && !empty(trim($_GET['query']))) {
     $search_term = trim($_GET['query']);
-    $search_like = "%" . $search_term . "%";
+    
+    $escaped_term = addcslashes($search_term, '%_\\');
+    
+    $search_like = "%" . $escaped_term . "%";
     
     $query = "SELECT u.username, u.user_id, p.profile_image_path 
               FROM users u 
@@ -34,6 +38,7 @@ if (isset($_GET['query']) && !empty(trim($_GET['query']))) {
               LIMIT 20";
               
     $stmt = $conn->prepare($query);
+    // Notice we pass $search_like to the LIKE clause, and the raw $search_term to the exact ID match
     $stmt->bind_param("ssi", $search_like, $search_term, $user_db_id);
     $stmt->execute();
     $res = $stmt->get_result();

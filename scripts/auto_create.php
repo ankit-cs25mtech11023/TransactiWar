@@ -1,10 +1,13 @@
 <?php
 require_once '/var/www/html/config/db_connect.php';
 
-for ($i = 1; $i <= 100; $i++) {
-    $username = 'testuser' . $i;
-    $email = 'testuser' . $i . '@iith.ac.in';
-    $password = 'Password@' . $i;
+$users_to_create = 100;
+$users_created = 0;
+
+while ($users_created < $users_to_create) {
+    $username = 'testuser_' . bin2hex(random_bytes(4));
+    $email = $username . '@iith.ac.in';
+    $password = bin2hex(random_bytes(8)); // Creates a 16-character random password
 
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
     $user_id = 'WAR-' . strtoupper(substr(uniqid(), -8));
@@ -20,15 +23,25 @@ for ($i = 1; $i <= 100; $i++) {
             $stmt_profile->bind_param("i", $new_db_id);
             $stmt_profile->execute();
 
-            echo "Successfully created user: " . $username . "
+            echo "Successfully created user: " . $username . " with password: " . $password . "
 ";
+            $users_created++;
         }
     } catch (mysqli_sql_exception $e) {
-        echo "Failed to create user: " . $username . ". Error: " . $e->getMessage() . "
+        // Error 1062: Duplicate entry for a unique key
+        if ($e->getCode() == 1062) {
+            echo "Username '" . $username . "' already exists. Generating a new one.
 ";
+        } else {
+            // For other errors, you might want to log them and stop the script
+            echo "Failed to create user. Error: " . $e->getMessage() . "
+";
+            // Optionally break the loop for other critical errors
+            // break;
+        }
     }
 }
 
-echo "Bulk user creation finished.
+echo "Bulk user creation finished. " . $users_created . " users created.
 ";
 ?>
